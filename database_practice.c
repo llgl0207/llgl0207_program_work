@@ -2,11 +2,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define CLEARSCREEN_SWITCH 1    //控制是否开启清屏功能的总开关
-#define ENABLE_INITIAL_INFO 0   //控制是否启用初始数据
-#define INITIAL_CAPACITY 10     //设置数据库初始容量
-#define AMPLI_MULTI 1.5         //设置容量用尽时的扩容倍数
-#define DEL_WAY 0               //删除学生记录的方式；
+#define CLEARSCREEN_SWITCH  1   //控制是否开启清屏功能的总开关
+#define ENABLE_INITIAL_INFO 1   //控制是否启用初始数据
+#define INITIAL_CAPACITY    10  //设置数据库初始容量
+#define AMPLI_MULTI         1.5 //设置容量用尽时的扩容倍数
+#define DEL_WAY             0   //删除学生记录的方式；
                                     //0：将删除项之后整体前移(整齐)
                                     //1：仅将最后一项覆盖被删除数据(节省资源)
 
@@ -117,7 +117,7 @@ int delStu(database *db,int index){//删除学生信息的子函数
 
 }
 
-int queryStuByName(database *db,char *name){//通过姓名精确查询学生信息的子函数
+int queryStuByName(database *db,char *name){//通过姓名精确查询学生信息的子函数，因为姓名是不可重复的所以比其他功能简短
     for(int i=0;i<=db->count-1;i++){
           if(strcmp(db->students[i].name,name)==0)
           return i;
@@ -125,7 +125,7 @@ int queryStuByName(database *db,char *name){//通过姓名精确查询学生信�
     return -1;
 }
 
-int displayQueryStuByAge(database *db,int age){
+int displayQueryStuByAge(database *db,int age){//显示与关键字相符的项并显示出来，返回是否成功查询的结果
     clearScreen();
     printf("---年龄查询---\n");
     int count=0;
@@ -143,7 +143,7 @@ int displayQueryStuByAge(database *db,int age){
         return 1;
     }
 }
-int displayQueryStuByGrade(database *db,int grade){
+int displayQueryStuByGrade(database *db,int grade){//显示与关键字相符的项并显示出来，返回是否成功查询的结果
     clearScreen();
     printf("---年级查询---\n");
     int count=0;
@@ -161,7 +161,7 @@ int displayQueryStuByGrade(database *db,int grade){
         return 1;
     }
 }
-int displayQueryStuByMajor(database *db,char *major){
+int displayQueryStuByMajor(database *db,char *major){//显示与关键字相符的项并显示出来，返回是否成功查询的结果
     clearScreen();
     printf("---专业查询---\n");
     int count=0;
@@ -180,7 +180,7 @@ int displayQueryStuByMajor(database *db,char *major){
     }
 }
 
-int queryStuByAge(database *db,int age,int index){
+int queryStuByAge(database *db,int age,int index){//根据关键字获取第index个符合条件的项
     int count;
     for(int i=0;i<=db->count-1;i++){
         if(db->students[i].age==age){
@@ -193,7 +193,7 @@ int queryStuByAge(database *db,int age,int index){
     return -1;
 }
 
-int queryStuByGrade(database *db,int grade,int index){
+int queryStuByGrade(database *db,int grade,int index){//根据关键字获取第index个符合条件的项
     int count;
     for(int i=0;i<=db->count-1;i++){
         if(db->students[i].grade==grade){
@@ -206,7 +206,7 @@ int queryStuByGrade(database *db,int grade,int index){
     return -1;
 }
 
-int queryStuByMajor(database *db,char *major,int index){
+int queryStuByMajor(database *db,char *major,int index){//根据关键字获取第index个符合条件的项
     int count;
     for(int i=0;i<=db->count-1;i++){
         if(strcmp(db->students[i].major,major)==0){
@@ -218,7 +218,7 @@ int queryStuByMajor(database *db,char *major,int index){
     }
     return -1;
 }
-void queryStu(database *db){
+void queryStu(database *db){//信息查询，不返回指定编号
 printf("---信息查询---\n");
     printf("1.通过姓名查询\n");
     printf("2.通过年龄查询\n");
@@ -256,7 +256,7 @@ printf("---信息查询---\n");
     }
 }
 
-int queryStuReturn(database *db){//查询学生信息总系统返回学生信息编号
+int queryStuReturn(database *db){//查询学生信息并返回学生信息编号
     printf("---信息查询---\n");
     printf("1.通过姓名查询\n");
     printf("2.通过年龄查询\n");
@@ -314,7 +314,7 @@ int queryStuReturn(database *db){//查询学生信息总系统返回学生信息
     }
 }
 
-void addStuUI(database *db){
+void addStuUI(database *db){//添加学生信息时的操作界面
         char name[50];
     int age;
     int grade;
@@ -323,7 +323,7 @@ void addStuUI(database *db){
         printf("---添加学生记录---\n");
         printf("请输入姓名：");
         scanf("%s",name);
-        if(queryStuByName(db,name)!=-1){
+        if(queryStuByName(db,name)!=-1){    
             printf("该姓名已存在!\n");
             waitForKey();
         }
@@ -364,9 +364,9 @@ void initDB(database *db){//初始化数据库
 }
 
 int main(){
-    setupConsoleEncoding();
+    setupConsoleEncoding();//将终端编码设置为936 GBK编码
     database db;//定义一个数据库
-    initDB(&db);
+    initDB(&db);//初始化数据库
     //db.students[5].age=1;
     int choice=0;
     //printf("%s",db.students[5].name);
