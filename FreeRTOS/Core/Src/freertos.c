@@ -25,7 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+//extern TIM_HandleTypeDef htim3;
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,7 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BLINK_TIME 100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -87,7 +87,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+	
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -140,7 +140,7 @@ void StartMyFirstTask(void *argument)
   for(;;)
   {
 		HAL_GPIO_TogglePin(DS0_GPIO_Port,DS0_Pin);
-		osDelay(100);
+		osDelay(BLINK_TIME);
   }
   /* USER CODE END StartMyFirstTask */
 }
@@ -156,11 +156,11 @@ void StartTask02(void *argument)
 {
   /* USER CODE BEGIN StartTask02 */
   /* Infinite loop */
-	osDelay(100);
+	osDelay(BLINK_TIME);
   for(;;)
   {
     HAL_GPIO_TogglePin(DS1_GPIO_Port,DS1_Pin);
-		osDelay(100);
+		osDelay(BLINK_TIME);
   }
   /* USER CODE END StartTask02 */
 }
@@ -175,10 +175,23 @@ void StartTask02(void *argument)
 void StartTask03(void *argument)
 {
   /* USER CODE BEGIN StartTask03 */
+		HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+		//__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2,400);
+		
+		for(int i=0;i<1000;i+=10){
+      __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, i);
+		  osDelay(5);
+    }
+		//osDelay(200);
+		
+    for(int i=1000;i>0;i-=10){
+      __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, i);
+		  osDelay(5);
+    }
+		
   }
   /* USER CODE END StartTask03 */
 }
