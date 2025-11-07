@@ -3,16 +3,16 @@
         {
             "name": "USART_CAN",
             "includePath": [
-                "e:\\github\\llgl0207_program_work\\USART_CAN\\Core\\Inc",
-                "e:\\github\\llgl0207_program_work\\USART_CAN\\Drivers\\STM32F4xx_HAL_Driver\\Inc",
-                "e:\\github\\llgl0207_program_work\\USART_CAN\\Drivers\\STM32F4xx_HAL_Driver\\Inc\\Legacy",
-                "e:\\github\\llgl0207_program_work\\USART_CAN\\Drivers\\CMSIS\\Device\\ST\\STM32F4xx\\Include",
-                "e:\\github\\llgl0207_program_work\\USART_CAN\\Drivers\\CMSIS\\Include",
+                "e:\\github\\llgl0207_program_work\\CAN\\Core\\Inc",
+                "e:\\github\\llgl0207_program_work\\CAN\\Drivers\\STM32F4xx_HAL_Driver\\Inc",
+                "e:\\github\\llgl0207_program_work\\CAN\\Drivers\\STM32F4xx_HAL_Driver\\Inc\\Legacy",
+                "e:\\github\\llgl0207_program_work\\CAN\\Drivers\\CMSIS\\Device\\ST\\STM32F4xx\\Include",
+                "e:\\github\\llgl0207_program_work\\CAN\\Drivers\\CMSIS\\Include",
                 "D:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include",
                 "D:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include\\rw",
-                "e:\\github\\llgl0207_program_work\\USART_CAN\\MDK-ARM",
-                "e:\\github\\llgl0207_program_work\\USART_CAN\\Core\\Src",
-                "e:\\github\\llgl0207_program_work\\USART_CAN\\Drivers\\STM32F4xx_HAL_Driver\\Src"
+                "e:\\github\\llgl0207_program_work\\CAN\\MDK-ARM",
+                "e:\\github\\llgl0207_program_work\\CAN\\Core\\Src",
+                "e:\\github\\llgl0207_program_work\\CAN\\Drivers\\STM32F4xx_HAL_Driver\\Src"
             ],
             "defines": [
                 "USE_HAL_DRIVER",
