@@ -1,0 +1,27 @@
+--cpu=Cortex-M4.fp
+"usart_can\startup_stm32f429xx.o"
+"usart_can\main.o"
+"usart_can\gpio.o"
+"usart_can\dma.o"
+"usart_can\usart.o"
+"usart_can\stm32f4xx_it.o"
+"usart_can\stm32f4xx_hal_msp.o"
+"usart_can\stm32f4xx_hal_uart.o"
+"usart_can\stm32f4xx_hal_rcc.o"
+"usart_can\stm32f4xx_hal_rcc_ex.o"
+"usart_can\stm32f4xx_hal_flash.o"
+"usart_can\stm32f4xx_hal_flash_ex.o"
+"usart_can\stm32f4xx_hal_flash_ramfunc.o"
+"usart_can\stm32f4xx_hal_gpio.o"
+"usart_can\stm32f4xx_hal_dma_ex.o"
+"usart_can\stm32f4xx_hal_dma.o"
+"usart_can\stm32f4xx_hal_pwr.o"
+"usart_can\stm32f4xx_hal_pwr_ex.o"
+"usart_can\stm32f4xx_hal_cortex.o"
+"usart_can\stm32f4xx_hal.o"
+"usart_can\stm32f4xx_hal_exti.o"
+"usart_can\system_stm32f4xx.o"
+--strict --scatter "USART_CAN\USART_CAN.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "USART_CAN.map" -o USART_CAN\USART_CAN.axf
