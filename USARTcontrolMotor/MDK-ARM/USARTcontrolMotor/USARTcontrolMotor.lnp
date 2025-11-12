@@ -1,0 +1,26 @@
+--cpu=Cortex-M4.fp
+"usartcontrolmotor\startup_stm32f429xx.o"
+"usartcontrolmotor\main.o"
+"usartcontrolmotor\gpio.o"
+"usartcontrolmotor\usart.o"
+"usartcontrolmotor\stm32f4xx_it.o"
+"usartcontrolmotor\stm32f4xx_hal_msp.o"
+"usartcontrolmotor\stm32f4xx_hal_uart.o"
+"usartcontrolmotor\stm32f4xx_hal_rcc.o"
+"usartcontrolmotor\stm32f4xx_hal_rcc_ex.o"
+"usartcontrolmotor\stm32f4xx_hal_flash.o"
+"usartcontrolmotor\stm32f4xx_hal_flash_ex.o"
+"usartcontrolmotor\stm32f4xx_hal_flash_ramfunc.o"
+"usartcontrolmotor\stm32f4xx_hal_gpio.o"
+"usartcontrolmotor\stm32f4xx_hal_dma_ex.o"
+"usartcontrolmotor\stm32f4xx_hal_dma.o"
+"usartcontrolmotor\stm32f4xx_hal_pwr.o"
+"usartcontrolmotor\stm32f4xx_hal_pwr_ex.o"
+"usartcontrolmotor\stm32f4xx_hal_cortex.o"
+"usartcontrolmotor\stm32f4xx_hal.o"
+"usartcontrolmotor\stm32f4xx_hal_exti.o"
+"usartcontrolmotor\system_stm32f4xx.o"
+--strict --scatter "USARTcontrolMotor\USARTcontrolMotor.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "USARTcontrolMotor.map" -o USARTcontrolMotor\USARTcontrolMotor.axf
