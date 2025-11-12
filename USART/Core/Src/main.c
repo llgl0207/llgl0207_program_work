@@ -45,22 +45,13 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t tx_data[8]={0x3};
-uint8_t rt_data[8];
-extern DMA_HandleTypeDef hdma_usart1_rx;
-
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-{
-  HAL_UART_Transmit_DMA(&huart1,rt_data, Size);
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1,rt_data,sizeof(rt_data));
-  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx,DMA_IT_HT);
-}
+uint8_t rx_byte; // 用于存放接收到的单个字节
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -100,8 +91,8 @@ int main(void)
   MX_DMA_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1,rt_data,sizeof(rt_data));
-  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx,DMA_IT_HT);
+  /* 启动UART接收中断，等待接收1个字节，存放到rx_byte中 */
+  HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -178,7 +169,18 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  /* 防止其他串口也调用这个回调 */
+  if(huart->Instance == USART1)
+  {
+    /* 将接收到的数据立刻发送回去（回传） */
+    HAL_UART_Transmit(&huart1, &rx_byte, 1, 0xFF);
 
+    /* 重新启动中断接收，准备接收下一个字节 */
+    HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
+  }
+}
 /* USER CODE END 4 */
 
 /**

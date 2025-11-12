@@ -44,13 +44,16 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t rx_byte; // 用于存放接收到的单个字节
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
+void Function_For_1(void);
+void Function_For_0(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -89,19 +92,24 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  /* 启动UART接收中断，等待接收1个字节，存放到rx_byte中 */
+  HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+		
+    /* 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟角斤拷锟斤拷锟斤拷锟斤拷 */
+		/*
 		//HAL_UART_Transmit(&huart1, (uint8_t*)"Hello 32\r\n", sizeof("Hello 32\r\n")-1, 100);
 		HAL_Delay(1000);
 		int temperature = 25;
 		char buffer[50];
-		sprintf(buffer, "Temperature: %d°C\r\n", temperature);
+		sprintf(buffer, "Temperature: %dC\r\n", temperature);
 		HAL_UART_Transmit(&huart1, (uint8_t*)buffer, strlen(buffer), 100);
+		*/
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -162,7 +170,50 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  /* 防止其他串口也调用这个回调 */
+  if(huart->Instance == USART1)
+  {
+    /* 核心判断逻辑 */
+    if(rx_byte == '1')
+    {
+      Function_For_1(); // 如果接收到字符'1'，执行函数A
+    }
+    else if(rx_byte == '0')
+    {
+      Function_For_0(); // 如果接收到字符'0'，执行函数B
+    }
 
+    /* 将接收到的数据立刻发送回去（回传） */
+    HAL_UART_Transmit(&huart1, &rx_byte, 1, 0xFF);
+
+    /* 重新启动中断接收，准备接收下一个字节 */
+    HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
+  }
+}
+
+/**
+  * @brief  当接收到'1'时执行的函数
+  * @retval None
+  */
+void Function_For_1(void)
+{
+  const char msg[] = "-> Received '1', executing Function A...\r\n";
+  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); // 发送提示信息
+  // 在这里添加你自己的代码，比如点亮一个LED、启动一个定时器等
+}
+
+/**
+  * @brief  当接收到'0'时执行的函数
+  * @retval None
+  */
+void Function_For_0(void)
+{
+  const char msg[] = "-> Received '0', executing Function B...\r\n";
+  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); // 发送提示信息
+  // 在这里添加你自己的代码，比如熄灭LED、停止定时器等
+}
 /* USER CODE END 4 */
 
 /**
