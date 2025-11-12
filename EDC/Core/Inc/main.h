@@ -1,0 +1,95 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.h
+  * @brief          : Header for main.c file.
+  *                   This file contains the common defines of the application.
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2025 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+
+/* Define to prevent recursive inclusion -------------------------------------*/
+#ifndef __MAIN_H
+#define __MAIN_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Includes ------------------------------------------------------------------*/
+#include "stm32f1xx_hal.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+
+/* USER CODE END Includes */
+
+/* Exported types ------------------------------------------------------------*/
+/* USER CODE BEGIN ET */
+
+/* USER CODE END ET */
+
+/* Exported constants --------------------------------------------------------*/
+/* USER CODE BEGIN EC */
+
+/* USER CODE END EC */
+
+/* Exported macro ------------------------------------------------------------*/
+/* USER CODE BEGIN EM */
+
+/* USER CODE END EM */
+
+/* Exported functions prototypes ---------------------------------------------*/
+void Error_Handler(void);
+
+/* USER CODE BEGIN EFP */
+
+/* USER CODE END EFP */
+
+/* Private defines -----------------------------------------------------------*/
+#define LED_Pin GPIO_PIN_13
+#define LED_GPIO_Port GPIOC
+#define DAC0_Pin GPIO_PIN_0
+#define DAC0_GPIO_Port GPIOA
+#define DAC1_Pin GPIO_PIN_1
+#define DAC1_GPIO_Port GPIOA
+#define SPK_Pin GPIO_PIN_2
+#define SPK_GPIO_Port GPIOA
+#define RA_Pin GPIO_PIN_0
+#define RA_GPIO_Port GPIOB
+#define RB_Pin GPIO_PIN_1
+#define RB_GPIO_Port GPIOB
+#define RS_Pin GPIO_PIN_2
+#define RS_GPIO_Port GPIOB
+#define KEY_UP_Pin GPIO_PIN_10
+#define KEY_UP_GPIO_Port GPIOB
+#define KEY_DOWN_Pin GPIO_PIN_11
+#define KEY_DOWN_GPIO_Port GPIOB
+#define KEY_LEFT_Pin GPIO_PIN_12
+#define KEY_LEFT_GPIO_Port GPIOB
+#define KEY_RIGHT_Pin GPIO_PIN_13
+#define KEY_RIGHT_GPIO_Port GPIOB
+#define CS1_Pin GPIO_PIN_14
+#define CS1_GPIO_Port GPIOB
+#define CS2_Pin GPIO_PIN_15
+#define CS2_GPIO_Port GPIOB
+
+/* USER CODE BEGIN Private defines */
+
+/* USER CODE END Private defines */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __MAIN_H */

@@ -18,12 +18,15 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "can.h"
+#include "spi.h"
+#include "tim.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <math.h>
+#define PI 3.14159
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -87,40 +90,24 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_CAN1_Init();
+  MX_TIM2_Init();
+  MX_USART1_UART_Init();
+  MX_SPI1_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  CAN_FilterTypeDef can_filter;
-  can_filter.FilterIdHigh = 0x0000;//ID高16位
-  can_filter.FilterIdLow = 0x0000;//ID低16位
-  can_filter.FilterMaskIdHigh = 0x0000;//ID掩码高16位
-  can_filter.FilterMaskIdLow = 0x000f;//ID掩码低16位
-  can_filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;//过滤器0关联到FIFO0
-  can_filter.FilterBank = 0;//过滤器0
-  can_filter.FilterMode = CAN_FILTERMODE_IDMASK;//ID掩码模式
-  can_filter.FilterScale = CAN_FILTERSCALE_32BIT;//32位过滤
-  can_filter.FilterActivation = ENABLE;//激活过滤器0
-  can_filter.SlaveStartFilterBank = 14;//从过滤器开始的过滤器编号
-  if(HAL_CAN_ConfigFilter(&hcan1,&can_filter)!=HAL_OK)
-  {
-
-  }
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+	HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		//HAL_UART_Transmit_DMA(&huart1,tx_data,sizeof(tx_data));
-		//HAL_Delay(500);
-		
-		//控制大疆电机
-    
-		
-		
-		
-		
-		
-		
+		for(int i=0;i<1000;i+=100){
+			//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, i);
+			HAL_Delay(100);
+		}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -137,30 +124,17 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Configure the main internal regulator output voltage
-  */
-  __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 15;
-  RCC_OscInitStruct.PLL.PLLN = 216;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Activate the Over-Drive mode
-  */
-  if (HAL_PWREx_EnableOverDrive() != HAL_OK)
   {
     Error_Handler();
   }
@@ -171,17 +145,36 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if(htim->Instance == TIM3)
+  {
+    static uint32_t counter1 = 0;
+		static uint32_t counter2 = 0;
+    counter1++;
+		counter2++;
+		if(counter1==100)counter1=0;
+		if(counter1==99)counter1=0;
+		int sine1=500*(1+sin(2*PI/100*counter1));
+		int sine2=500*(1+cos(2*PI/100*counter2));
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, sine1);
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, sine2);
+		
+    
+    // ������ˢ����ı���
+    // ���磺ÿ1msִ��һ��
+  }
+}
 /* USER CODE END 4 */
 
 /**
