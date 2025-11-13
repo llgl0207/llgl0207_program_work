@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "can.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -44,7 +45,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t rx_byte; // 用于存放接收到的单个字节
+uint8_t rx_byte; // ??????????????????
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -54,6 +55,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
 void Function_For_1(void);
 void Function_For_0(void);
+
+void CAN_SendMessage(uint8_t *data);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -91,9 +94,30 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_CAN1_Init();
   /* USER CODE BEGIN 2 */
-  /* 启动UART接收中断，等待接收1个字节，存放到rx_byte中 */
+
   HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
+	
+	
+	
+	
+	
+	
+	
+	if (HAL_CAN_Start(&hcan1) != HAL_OK) {
+  // 启动错误处理
+  Error_Handler();
+}
+	
+
+
+
+
+
+
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -101,7 +125,36 @@ int main(void)
   while (1)
   {
 		
-    /* 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟角斤拷锟斤拷锟斤拷锟斤拷 */
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		uint8_t canData[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+    CAN_SendMessage(canData);
+    HAL_Delay(1000);  // 每秒发送一次
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+    /* ??????????????????????? */
 		/*
 		//HAL_UART_Transmit(&huart1, (uint8_t*)"Hello 32\r\n", sizeof("Hello 32\r\n")-1, 100);
 		HAL_Delay(1000);
@@ -170,49 +223,86 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+
+
+
+
+
+
+
+
+void CAN_SendMessage(uint8_t *data) {
+  CAN_TxHeaderTypeDef TxHeader;
+  uint32_t TxMailbox;
+
+  // 配置发送消息头
+  TxHeader.StdId = 0x1FE;
+  TxHeader.ExtId = 0;
+  TxHeader.IDE = CAN_ID_STD;
+  TxHeader.RTR = CAN_RTR_DATA;
+  TxHeader.DLC = 8;
+  TxHeader.TransmitGlobalTime = DISABLE;
+
+  if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, data, &TxMailbox) != HAL_OK) {
+    Error_Handler();
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  /* 防止其他串口也调用这个回调 */
+
   if(huart->Instance == USART1)
   {
-    /* 核心判断逻辑 */
+
     if(rx_byte == '1')
     {
-      Function_For_1(); // 如果接收到字符'1'，执行函数A
+      Function_For_1(); 
     }
     else if(rx_byte == '0')
     {
-      Function_For_0(); // 如果接收到字符'0'，执行函数B
+      Function_For_0(); 
     }
 
-    /* 将接收到的数据立刻发送回去（回传） */
+  
     HAL_UART_Transmit(&huart1, &rx_byte, 1, 0xFF);
 
-    /* 重新启动中断接收，准备接收下一个字节 */
+ 
     HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
   }
 }
 
-/**
-  * @brief  当接收到'1'时执行的函数
-  * @retval None
-  */
 void Function_For_1(void)
 {
   const char msg[] = "-> Received '1', executing Function A...\r\n";
-  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); // 发送提示信息
-  // 在这里添加你自己的代码，比如点亮一个LED、启动一个定时器等
+  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); 
+ 
 }
 
-/**
-  * @brief  当接收到'0'时执行的函数
-  * @retval None
-  */
+
 void Function_For_0(void)
 {
   const char msg[] = "-> Received '0', executing Function B...\r\n";
-  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); // 发送提示信息
-  // 在这里添加你自己的代码，比如熄灭LED、停止定时器等
+  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); // ??????????
+ 
 }
 /* USER CODE END 4 */
 

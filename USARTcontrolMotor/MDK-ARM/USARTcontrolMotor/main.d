@@ -23,12 +23,14 @@ usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_exti
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma.h
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma_ex.h
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_cortex.h
+usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_can.h
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash.h
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ex.h
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h
 usartcontrolmotor\main.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h
+usartcontrolmotor\main.o: ../Core/Inc/can.h
 usartcontrolmotor\main.o: ../Core/Inc/usart.h
 usartcontrolmotor\main.o: ../Core/Inc/gpio.h
 usartcontrolmotor\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
