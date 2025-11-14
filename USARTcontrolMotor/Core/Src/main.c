@@ -45,7 +45,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t rx_byte; // ??????????????????
+uint8_t rx_byte; 
+int direction=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,6 +56,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
 void Function_For_1(void);
 void Function_For_0(void);
+void Function_For_m1(void);
 
 void CAN_SendMessage(uint8_t *data);
 /* USER CODE END PFP */
@@ -130,18 +132,38 @@ int main(void)
 		
 		
 		
+		uint8_t num=0x0A;
+		if(direction==1){
+			int16_t current_value = +1000;
 		
-		
-		
-		
-		
-		
-		
-		
-		uint8_t canData[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+		uint8_t canData[8] = {(uint8_t)(current_value & 0xFF),(uint8_t)((current_value >> 8) & 0xFF),num,num,num,num,num};
     CAN_SendMessage(canData);
-    HAL_Delay(1000);  // 每秒发送一次
+    //HAL_Delay(100);  // 每秒发送一次
+		}else if(direction==-1){
+		int16_t current_value = +100;
+		//uint8_t num=0x0A;
+		uint8_t canData[8] = {(uint8_t)(current_value & 0xFF),(uint8_t)((current_value >> 8) & 0xFF),num,num,num,num,num};
+    CAN_SendMessage(canData);
+    //HAL_Delay(100);  // 每秒发送一次
+		}else{
+		int16_t current_value = +0;
+		//uint8_t num=0x0A;
+		uint8_t canData[8] = {(uint8_t)(current_value & 0xFF),(uint8_t)((current_value >> 8) & 0xFF),num,num,num,num,num};
+    CAN_SendMessage(canData);
+    //HAL_Delay(100);  // 每秒发送一次
+		}
+		HAL_Delay(100);
 		
+		
+		
+		
+		/*
+		int16_t current_value = +1000;
+		uint8_t num=0x0A;
+		uint8_t canData[8] = {(uint8_t)(current_value & 0xFF),(uint8_t)((current_value >> 8) & 0xFF),num,num,num,num,num};
+    CAN_SendMessage(canData);
+    HAL_Delay(100);  // 每秒发送一次
+		*/
 		
 		
 		
@@ -237,7 +259,7 @@ void CAN_SendMessage(uint8_t *data) {
   uint32_t TxMailbox;
 
   // 配置发送消息头
-  TxHeader.StdId = 0x1FE;
+  TxHeader.StdId = 0x2FE;
   TxHeader.ExtId = 0;
   TxHeader.IDE = CAN_ID_STD;
   TxHeader.RTR = CAN_RTR_DATA;
@@ -273,7 +295,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   if(huart->Instance == USART1)
   {
 
-    if(rx_byte == '1')
+    if(rx_byte == '+')
     {
       Function_For_1(); 
     }
@@ -281,6 +303,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     {
       Function_For_0(); 
     }
+		else if(rx_byte == '-')
+		{
+			Function_For_m1();
+		}
 
   
     HAL_UART_Transmit(&huart1, &rx_byte, 1, 0xFF);
@@ -292,15 +318,25 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 void Function_For_1(void)
 {
-  const char msg[] = "-> Received '1', executing Function A...\r\n";
-  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); 
+  const char msg[] = "-> Received '1', executing Clockwise Rotation...\r\n";
+  direction=1;
+	HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); 
  
 }
 
 
 void Function_For_0(void)
 {
-  const char msg[] = "-> Received '0', executing Function B...\r\n";
+  const char msg[] = "-> Received '0', executing Stop...\r\n";
+	direction=0;
+  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); // ??????????
+ 
+}
+
+void Function_For_m1(void)
+{
+  const char msg[] = "-> Received '-1', executing Anticlockwise Rotation...\r\n";
+	direction=-1;
   HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 100); // ??????????
  
 }
