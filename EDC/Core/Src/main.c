@@ -161,14 +161,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   {
     static uint32_t counter1 = 0;
 		static uint32_t counter2 = 0;
+		static int mcount;
+		static int freq=100;
+		static int count=0;
+		count++;
+		mcount=1.0/freq*1000;
+		if(count%100==0){freq++;}
     counter1++;
 		counter2++;
-		if(counter1==100)counter1=0;
-		if(counter1==99)counter1=0;
-		int sine1=500*(1+sin(2*PI/100*counter1));
-		int sine2=500*(1+cos(2*PI/100*counter2));
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, sine1);
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, sine2);
+		if(freq==1000){freq=0;}
+		if(counter1==mcount){counter1=0;}
+		if(counter2==mcount){counter2=0;}
+		int dac0=100*(1+sin(2*PI/mcount*counter1));
+		int dac1=100*(1+cos(2*PI/mcount*counter2));
+		//int dac0=counter1;
+		//int dac1=counter2;
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, dac0);
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, dac1);
 		
     
     // ������ˢ����ı���
