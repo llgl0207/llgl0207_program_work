@@ -34,3 +34,9 @@ usartcontrolmotor\main.o: ../Core/Inc/can.h
 usartcontrolmotor\main.o: ../Core/Inc/usart.h
 usartcontrolmotor\main.o: ../Core/Inc/gpio.h
 usartcontrolmotor\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+usartcontrolmotor\main.o: ../User/dvc_serialplot.h
+usartcontrolmotor\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdarg.h
+usartcontrolmotor\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+usartcontrolmotor\main.o: ../User/drv_uart.h
+usartcontrolmotor\main.o: ../User/drv_bsp.h
+usartcontrolmotor\main.o: ../User/drv_can.h

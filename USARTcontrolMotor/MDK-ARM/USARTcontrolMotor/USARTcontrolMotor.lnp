@@ -1,5 +1,9 @@
 --cpu=Cortex-M4.fp
 "usartcontrolmotor\startup_stm32f429xx.o"
+"usartcontrolmotor\drv_bsp.o"
+"usartcontrolmotor\drv_can.o"
+"usartcontrolmotor\drv_uart.o"
+"usartcontrolmotor\dvc_serialplot.o"
 "usartcontrolmotor\main.o"
 "usartcontrolmotor\gpio.o"
 "usartcontrolmotor\can.o"
