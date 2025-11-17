@@ -29,6 +29,13 @@ edc\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_spi.h
 edc\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim.h
 edc\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim_ex.h
 edc\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_uart.h
+edc\main.o: ../FATFS/App/fatfs.h
+edc\main.o: ../Middlewares/Third_Party/FatFs/src/ff.h
+edc\main.o: ../Middlewares/Third_Party/FatFs/src/integer.h
+edc\main.o: ../FATFS/Target/ffconf.h
+edc\main.o: ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h
+edc\main.o: ../Middlewares/Third_Party/FatFs/src/diskio.h
+edc\main.o: ../FATFS/Target/user_diskio.h
 edc\main.o: ../Core/Inc/spi.h
 edc\main.o: ../Core/Inc/tim.h
 edc\main.o: ../Core/Inc/usart.h

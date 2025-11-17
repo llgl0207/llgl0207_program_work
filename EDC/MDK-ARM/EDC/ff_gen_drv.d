@@ -1,0 +1,36 @@
+edc\ff_gen_drv.o: ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.c
+edc\ff_gen_drv.o: ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h
+edc\ff_gen_drv.o: ../Middlewares/Third_Party/FatFs/src/diskio.h
+edc\ff_gen_drv.o: ../Middlewares/Third_Party/FatFs/src/integer.h
+edc\ff_gen_drv.o: ../Middlewares/Third_Party/FatFs/src/ff.h
+edc\ff_gen_drv.o: ../FATFS/Target/ffconf.h
+edc\ff_gen_drv.o: ../Core/Inc/main.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal.h
+edc\ff_gen_drv.o: ../Core/Inc/stm32f1xx_hal_conf.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_rcc.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_def.h
+edc\ff_gen_drv.o: ../Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f1xx.h
+edc\ff_gen_drv.o: ../Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f103xb.h
+edc\ff_gen_drv.o: ../Drivers/CMSIS/Include/core_cm3.h
+edc\ff_gen_drv.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+edc\ff_gen_drv.o: ../Drivers/CMSIS/Include/cmsis_version.h
+edc\ff_gen_drv.o: ../Drivers/CMSIS/Include/cmsis_compiler.h
+edc\ff_gen_drv.o: ../Drivers/CMSIS/Include/cmsis_armcc.h
+edc\ff_gen_drv.o: ../Drivers/CMSIS/Device/ST/STM32F1xx/Include/system_stm32f1xx.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h
+edc\ff_gen_drv.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_rcc_ex.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_gpio.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_gpio_ex.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_exti.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_dma.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_dma_ex.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_cortex.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash_ex.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_pwr.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_spi.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim_ex.h
+edc\ff_gen_drv.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_uart.h
