@@ -71,8 +71,6 @@ void Error_Handler(void);
 #define FLASH_CS_GPIO_Port GPIOA
 #define RA_Pin GPIO_PIN_0
 #define RA_GPIO_Port GPIOB
-#define RS_Pin GPIO_PIN_2
-#define RS_GPIO_Port GPIOB
 #define KEY_UP_Pin GPIO_PIN_10
 #define KEY_UP_GPIO_Port GPIOB
 #define KEY_DOWN_Pin GPIO_PIN_11
@@ -85,6 +83,9 @@ void Error_Handler(void);
 #define CS1_GPIO_Port GPIOB
 #define CS2_Pin GPIO_PIN_15
 #define CS2_GPIO_Port GPIOB
+#define RS_Pin GPIO_PIN_8
+#define RS_GPIO_Port GPIOA
+#define RS_EXTI_IRQn EXTI9_5_IRQn
 
 /* USER CODE BEGIN Private defines */
 

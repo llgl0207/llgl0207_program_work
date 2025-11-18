@@ -51,6 +51,11 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+uint16_t volume =80;
+uint8_t pitch =60;
+uint32_t last_interrupt_time=0;
+uint32_t current_time=0;
+uint8_t func=0;
 static int freq=500;
 static int count_S=0;
 #define LENGTH 32
@@ -244,7 +249,7 @@ int main(void)
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL); // 启动TIM4的编码器接口
-	
+/*
 	uint8_t large_data_buffer[300]; 
 for(int i=0; i<300; i++) {
     large_data_buffer[i] = i; // 填充一些测试数据
@@ -277,7 +282,7 @@ HAL_Delay(10);
 HAL_Delay(10);
 // 如果 is_match 为 true，说明跨页写入完全成功！
 // 你可以在断点中查看 is_match 的值。
-	
+*/
 /*
 // 假设你已经配置好了UART，并重定义了printf
 // printf("Starting SPI Flash Test...\r\n");
@@ -345,16 +350,24 @@ SPI_Flash_ReadData(flash_Address, read_Buffer, sizeof(read_Buffer));
   /* USER CODE BEGIN WHILE */
   while (1)
   {	
-		uint8_t write_Buffer[]="Hello!";
-		uint8_t read_Buffer[300]={0};
+		static uint16_t encoder=0;
+		static uint16_t last_encoder=0;
+		encoder=__HAL_TIM_GET_COUNTER(&htim4);
+		int delta=encoder-last_encoder;
+		last_encoder=encoder;
+		if(func==0){volume+=delta/4;}
+		if(func==1){pitch+=delta/4;}
+		
+		//HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_13);
+		//uint8_t write_Buffer[]="Hello!";
+		//uint8_t read_Buffer[300]={0};
 		//SPI_Flash_PageWrite(0x00000000, write_Buffer, sizeof(write_Buffer)); // 内部包含写使能和等待
-		SPI_Flash_ReadData(0x10F0, read_Buffer, sizeof(read_Buffer));
-		HAL_Delay(10);
+		//SPI_Flash_ReadData(0x10F0, read_Buffer, sizeof(read_Buffer));
+		//HAL_Delay(10);
 		if(count_S==LENGTH)count_S=0;
-		//if(count_S%2==0){scale=Music_Score[count_S/2];}
-		//if(count_S%2==0){scale=70;}
-		scale=Music_Score[count_S];
-		//scale=__HAL_TIM_GET_COUNTER(&htim4)/4;
+		
+		//scale=Music_Score[count_S];
+		scale=pitch;
 		freq=440*pow(2,(scale-69.0)/12.0)*LENGTH_OF_WAVE/2;
 		int AAR = 1e6/freq;
 		if(Music_Score[count_S]!=0){
@@ -364,12 +377,12 @@ SPI_Flash_ReadData(flash_Address, read_Buffer, sizeof(read_Buffer));
 			HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
 			HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
 		}
-		//__HAL_TIM_SET_AUTORELOAD(&htim3,AAR ); // 使用宏设置//播放音乐请注释
+		__HAL_TIM_SET_AUTORELOAD(&htim3,AAR ); // 使用宏设置//播放音乐请注释
 		count_S++;
-		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_SET);
-		HAL_Delay(150);
-		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_RESET);
-		HAL_Delay(150);
+		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_SET);
+		HAL_Delay(100);
+		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_RESET);
+		//HAL_Delay(150);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -417,6 +430,42 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  // 1. 判断是哪个引脚触发了中断
+  // 因为你配置的是PB2，所以这里判断GPIO_PIN_2
+  if(GPIO_Pin == RS_Pin)
+  {
+		 uint32_t current_time = HAL_GetTick();//获取当前时间用于按键消抖
+
+
+    if(current_time - last_interrupt_time > 100)//判断当前时间与上一次中断触发时间的间隔是否大于50ms，用于消抖
+    {
+			//=======================================EXTI=========================================
+      //there are codes which will be activated when the EXTI happened.
+				//HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_13);
+				func++;
+				if(func==2)func=0;
+				
+			}
+    }
+    last_interrupt_time = current_time;//更新上一次中断触发时间
+    // 2. 在这里写你的中断处理代码
+    
+    // --- 示例：翻转一个LED ---
+    // 假设你在PC13上接了一个LED，并且在CubeMX里配置好了
+     
+
+    // --- 示例：发送一个串口信息 ---
+    // 注意：中断函数里要避免使用printf等耗时操作，可以用快速的非阻塞方式
+    // printf("PB2 Interrupt Triggered!\r\n"); // 不推荐在中断里用
+
+    // --- 示例：设置一个全局标志位 ---
+    // 定义一个全局变量 volatile bool pb2_flag = false;
+    // 在这里设置 pb2_flag = true;
+    // 然后在main循环里检查这个标志位来处理事件
+  
+}
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if(htim->Instance == TIM3)
@@ -446,19 +495,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		static short int wave_counter=0;
 		wave_counter++;
 		if(wave_counter==LENGTH_OF_WAVE)wave_counter=0;
-		int16_t encoder_count = __HAL_TIM_GET_COUNTER(&htim4)+300; // 获取TIM4的计数器值
 		
-		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, Wave[wave_counter]*encoder_count/500);
-		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, Wave[wave_counter]*encoder_count/500);
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, Wave[wave_counter]*volume/100);
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, Wave[wave_counter]*volume/100);
 		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, Wave[wave_counter]);
 		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, Wave[wave_counter]);
-		
+		/*
 		static uint32_t counter = 0;
 		counter+=2;
 		if(counter==18000){counter=0;}
 		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, datt[counter]);
 		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, datt[counter+1]);
-		
+		*/
 		
 		
 		
