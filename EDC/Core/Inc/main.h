@@ -67,6 +67,8 @@ void Error_Handler(void);
 #define SPK_GPIO_Port GPIOA
 #define SD_CS_Pin GPIO_PIN_3
 #define SD_CS_GPIO_Port GPIOA
+#define FLASH_CS_Pin GPIO_PIN_4
+#define FLASH_CS_GPIO_Port GPIOA
 #define RA_Pin GPIO_PIN_0
 #define RA_GPIO_Port GPIOB
 #define RS_Pin GPIO_PIN_2
