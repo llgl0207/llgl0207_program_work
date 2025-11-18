@@ -87,66 +87,62 @@ void SPI_Flash_ReadData(uint32_t readAddr, uint8_t* buffer, uint16_t len);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-/**
- * @brief  等待Flash内部写操作完成
- * @param  None
- * @retval None
- */
+// 等待写/擦除操作完成
 void SPI_Flash_WaitForWriteEnd(void)
 {
     uint8_t status = 0;
+    uint8_t cmd = 0x05; // Read Status Register command
+
     FLASH_CS_LOW();
-    HAL_SPI_Transmit(&hspi1, (uint8_t*)0x05, 1, HAL_MAX_DELAY); // 发送读状态指令
+    HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
     do {
-        HAL_SPI_Receive(&hspi1, &status, 1, HAL_MAX_DELAY);     // 循环读取状态
+        HAL_SPI_Receive(&hspi1, &status, 1, HAL_MAX_DELAY);
     } while ((status & 0x01) == 0x01); // 检查BUSY位(bit 0)是否为0
     FLASH_CS_HIGH();
 }
 
-/**
- * @brief  Flash写使能
- * @param  None
- * @retval None
- */
+// 写使能
 void SPI_Flash_WriteEnable(void)
 {
     FLASH_CS_LOW();
-    HAL_SPI_Transmit(&hspi1, (uint8_t*)0x06, 1, HAL_MAX_DELAY); // 发送写使能指令
+    uint8_t cmd = 0x06; // Write Enable command
+    HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
     FLASH_CS_HIGH();
+    // 可以加一个极小的延时，让芯片稳定一下
+    HAL_Delay(1); 
 }
 
-/**
- * @brief  扇区擦除 (4KB)
- * @param  sectorAddr: 要擦除的扇区地址
- * @retval None
- */
 void SPI_Flash_SectorErase(uint32_t sectorAddr)
 {
-    SPI_Flash_WriteEnable(); // 擦除前必须先写使能
+    // 1. 发送写使能
+    SPI_Flash_WriteEnable();
+
+    // 2. 发送扇区擦除指令
     FLASH_CS_LOW();
     uint8_t cmd[4] = {0x20, (sectorAddr >> 16) & 0xFF, (sectorAddr >> 8) & 0xFF, sectorAddr & 0xFF};
     HAL_SPI_Transmit(&hspi1, cmd, 4, HAL_MAX_DELAY);
     FLASH_CS_HIGH();
-    SPI_Flash_WaitForWriteEnd(); // 等待擦除完成
+
+    // 3. 等待擦除完成 (这一步至关重要！)
+    SPI_Flash_WaitForWriteEnd();
 }
 
-/**
- * @brief  页写入 (最多256字节)
- * @param  pageAddr: 写入的起始地址
- * @param  data: 要写入的数据缓冲区
- * @param  dataLen: 要写入的数据长度
- * @retval None
- */
 void SPI_Flash_PageWrite(uint32_t pageAddr, uint8_t* data, uint16_t dataLen)
 {
-    SPI_Flash_WriteEnable(); // 写入前必须先写使能
+    // 1. 发送写使能
+    SPI_Flash_WriteEnable();
+
+    // 2. 发送页编程指令和数据
     FLASH_CS_LOW();
     uint8_t cmd[4] = {0x02, (pageAddr >> 16) & 0xFF, (pageAddr >> 8) & 0xFF, pageAddr & 0xFF};
     HAL_SPI_Transmit(&hspi1, cmd, 4, HAL_MAX_DELAY);
     HAL_SPI_Transmit(&hspi1, data, dataLen, HAL_MAX_DELAY);
     FLASH_CS_HIGH();
-    SPI_Flash_WaitForWriteEnd(); // 等待写入完成
+
+    // 3. 等待写入完成 (同样至关重要！)
+    SPI_Flash_WaitForWriteEnd();
 }
+
 
 /**
  * @brief  读取数据
@@ -162,6 +158,49 @@ void SPI_Flash_ReadData(uint32_t readAddr, uint8_t* buffer, uint16_t len)
     HAL_SPI_Transmit(&hspi1, cmd, 4, HAL_MAX_DELAY);
     HAL_SPI_Receive(&hspi1, buffer, len, HAL_MAX_DELAY);
     FLASH_CS_HIGH();
+}
+
+#define FLASH_PAGE_SIZE 256
+
+/**
+ * @brief  可以处理跨页的通用写入函数
+ * @param  startAddr: 写入的起始地址
+ * @param  data: 要写入的数据缓冲区
+ * @param  totalLen: 要写入的总长度
+ * @note   重要：调用此函数前，必须确保目标区域已被擦除！
+ * @retval None
+ */
+void SPI_Flash_WriteData_CrossPage(uint32_t startAddr, uint8_t* data, uint32_t totalLen)
+{
+    uint32_t page_offset;
+    uint16_t bytes_to_write_now;
+    uint8_t* data_ptr = data;
+
+    while(totalLen > 0)
+    {
+        // 1. 计算当前页的偏移量
+        page_offset = startAddr % FLASH_PAGE_SIZE;
+
+        // 2. 计算当前页还剩多少空间可以写
+        uint16_t space_left_in_page = FLASH_PAGE_SIZE - page_offset;
+
+        // 3. 决定本次写入多少字节
+        if (totalLen < space_left_in_page) {
+            // 如果剩余数据能写进当前页，就全部写入
+            bytes_to_write_now = totalLen;
+        } else {
+            // 否则，只写满当前页剩余的空间
+            bytes_to_write_now = space_left_in_page;
+        }
+
+        // 4. 执行一次页写入
+        SPI_Flash_PageWrite(startAddr, data_ptr, bytes_to_write_now);
+
+        // 5. 更新指针、地址和剩余长度，为下一次写入做准备
+        startAddr += bytes_to_write_now;
+        data_ptr += bytes_to_write_now;
+        totalLen -= bytes_to_write_now;
+    }
 }
 /* USER CODE END 0 */
 
@@ -206,8 +245,81 @@ int main(void)
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL); // 启动TIM4的编码器接口
 	
+	uint8_t large_data_buffer[300]; 
+for(int i=0; i<300; i++) {
+    large_data_buffer[i] = i; // 填充一些测试数据
+}
+
+uint32_t write_addr = 0x10F0; // 一个会导致跨页的起始地址
+uint8_t read_buffer[300];
+
+// 1. 【关键】先擦除！
+// 我们的300字节数据都在0x1000这个4KB扇区内，所以擦除一次就够了。
+SPI_Flash_SectorErase(0x1000); 
+
+// 2. 【核心】调用新的跨页写入函数
+SPI_Flash_WriteData_CrossPage(write_addr, large_data_buffer, 300);
+
+// 3. 【验证】读取数据并比较
+SPI_Flash_ReadData(write_addr, read_buffer, 300);
+
+// 4. 检查读取的数据是否和写入的一致
+int is_match = 1;
+for(int i=0; i<300; i++) {
+    if (read_buffer[i] != large_data_buffer[i]) {
+        is_match = 0;
+        break;
+    }
+}
+if(is_match==1){
+HAL_Delay(10);
+}
+HAL_Delay(10);
+// 如果 is_match 为 true，说明跨页写入完全成功！
+// 你可以在断点中查看 is_match 的值。
 	
-	
+/*
+// 假设你已经配置好了UART，并重定义了printf
+// printf("Starting SPI Flash Test...\r\n");
+
+uint8_t write_Buffer[] = "Hello SPI Flash! 1234567890"; // 测试数据
+uint8_t read_Buffer[32];
+uint32_t test_Address = 0x1000; // 选择一个测试地址，比如4KB的位置
+
+// 1. 【诊断】先读取一下，看看这个地址里原来是什么
+SPI_Flash_ReadData(test_Address, read_Buffer, 10);
+// printf("Original data at 0x%X: %s\r\n", test_Address, read_Buffer);
+// 在这里设置断点，查看read_Buffer
+
+// 2. 【关键】执行完整的擦除流程
+// printf("Erasing sector at 0x%X...\r\n", test_Address);
+SPI_Flash_SectorErase(test_Address); // 这个函数内部已经包含了写使能和等待
+
+// 3. 【诊断】擦除后再次读取，应该全是0xFF
+SPI_Flash_ReadData(test_Address, read_Buffer, 10);
+// printf("Data after erase: ");
+// for(int i=0; i<10; i++) printf("0x%02X ", read_Buffer[i]);
+// printf("\r\n");
+// 在这里设置断点，检查read_Buffer里的每个字节是不是都是0xFF
+
+// 4. 【关键】执行完整的写入流程
+// printf("Writing data to flash...\r\n");
+SPI_Flash_PageWrite(test_Address, write_Buffer, sizeof(write_Buffer)); // 内部包含写使能和等待
+
+// 5. 【诊断】读取写入的数据，进行验证
+// printf("Reading data back from flash...\r\n");
+SPI_Flash_ReadData(test_Address, read_Buffer, sizeof(read_Buffer));
+// printf("Data read back: %s\r\n", read_Buffer);
+// 在这里设置断点，查看read_Buffer是否和write_Buffer完全一致
+
+// 如果一致，恭喜你，Flash读写成功了！
+HAL_Delay(150);HAL_Delay(150);
+HAL_Delay(150);HAL_Delay(150);
+*/
+
+
+
+/*
 	uint8_t write_Buffer[] = "STM32 C8T6 SPI Flash Test!";
 uint8_t read_Buffer[32];
 uint32_t flash_Address = 0x0000; // 选择一个起始地址
@@ -225,16 +337,19 @@ SPI_Flash_ReadData(flash_Address, read_Buffer, sizeof(read_Buffer));
 
 // 4. 此时，read_Buffer里的内容应该和write_Buffer一样了
 // 你可以通过设置断点查看read_Buffer的值，或者通过串口打印出来
+*/
 
-HAL_Delay(150);HAL_Delay(150);
-HAL_Delay(150);HAL_Delay(150);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {	
-		
+		uint8_t write_Buffer[]="Hello!";
+		uint8_t read_Buffer[300]={0};
+		//SPI_Flash_PageWrite(0x00000000, write_Buffer, sizeof(write_Buffer)); // 内部包含写使能和等待
+		SPI_Flash_ReadData(0x10F0, read_Buffer, sizeof(read_Buffer));
+		HAL_Delay(10);
 		if(count_S==LENGTH)count_S=0;
 		//if(count_S%2==0){scale=Music_Score[count_S/2];}
 		//if(count_S%2==0){scale=70;}
