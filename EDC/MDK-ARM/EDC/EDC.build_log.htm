@@ -28,13 +28,15 @@ Project File Date:  11/19/2025
 *** Using Compiler 'V5.06 update 6 (build 750)', folder: 'D:\Program Files\Keil_v5\ARM\ARMCC\Bin'
 Build target 'EDC'
 compiling main.c...
-../Core/Src/main.c(168): warning:  #47-D: incompatible redefinition of macro "FLASH_PAGE_SIZE"  (declared at line 241 of "../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash_ex.h")
+../Core/Src/main.c(311): warning:  #47-D: incompatible redefinition of macro "FLASH_PAGE_SIZE"  (declared at line 241 of "../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash_ex.h")
   #define FLASH_PAGE_SIZE 256
-../Core/Src/main.c: 1 warning, 0 errors
+../Core/Src/main.c(492): warning:  #223-D: function "snprintf" declared implicitly
+          snprintf(hex_str, sizeof(hex_str), "%02X ", rx_byte); // ???????????? "XX "
+../Core/Src/main.c: 2 warnings, 0 errors
 linking...
-Program Size: Code=15448 RO-data=456 RW-data=116 ZI-data=2020  
+Program Size: Code=23260 RO-data=516 RW-data=92 ZI-data=11388  
 FromELF: creating hex file...
-"EDC\EDC.axf" - 0 Error(s), 1 Warning(s).
+"EDC\EDC.axf" - 0 Error(s), 2 Warning(s).
 
 <h2>Software Packages used:</h2>
 

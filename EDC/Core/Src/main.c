@@ -18,7 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "fatfs.h"
+#include "dma.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -27,6 +27,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <math.h>
+#include <string.h> // 需要包含这个头文件来使用 memcpy
 #define PI 3.14159
 
 #define FLASH_CS_LOW()   HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET)
@@ -51,6 +52,30 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+//#define BUFFER_SIZE 4096 // 4KB, 正好是一个扇区的大小// BUFFER_SIZE 宏定义已移至 main.h
+
+// 主要的数据缓冲区，用于UART接收
+uint8_t data_buffer[BUFFER_SIZE];
+
+// 【新增】验证缓冲区，用于存放从Flash读回的数据
+uint8_t verify_buffer[BUFFER_SIZE];
+
+// 【新增】用于记录实际接收到的数据长度
+volatile uint16_t uart_rx_len = 0;
+
+// SPI DMA发送时使用的临时缓冲区，用于存放“指令+地址+数据”
+uint8_t dma_tx_buffer[4 + FLASH_PAGE_SIZE]; // 最大4字节指令+256字节数据
+
+// 状态标志位，使用 uint8_t 代替 bool (0=FALSE, 1=TRUE)
+volatile uint8_t uart_rx_idle_flag = 0; // 改为空闲标志
+volatile uint8_t spi_tx_busy_flag = 0;
+
+// Flash地址管理
+uint32_t current_flash_addr = 0;
+
+
+
+
 uint16_t volume =80;
 uint8_t pitch =60;
 uint32_t last_interrupt_time=0;
@@ -92,6 +117,124 @@ void SPI_Flash_ReadData(uint32_t readAddr, uint8_t* buffer, uint16_t len);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/**
+ * @brief  使用DMA方式写入一页数据（不超过256字节）
+ * @param  addr: Flash起始地址
+ * @param  buf: 数据缓冲区指针
+ * @param  len:  要写入的数据长度 (必须 <= 256)
+ * @retval None
+ * @note   此函数会启动DMA传输，然后立即返回。真正的完成和等待在中断回调中处理。
+ */
+void SPI_Flash_PageWrite_DMA(uint32_t addr, uint8_t* buf, uint16_t len)
+{
+    uint8_t cmd_buffer[4];
+    uint8_t write_enable_cmd = 0x06; // Write Enable 指令
+
+    // 1. 发送写使能命令
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_Transmit(&hspi1, &write_enable_cmd, 1, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+
+    // 2. 准备发送页编程命令和地址
+    cmd_buffer[0] = 0x02; // Page Program指令
+    cmd_buffer[1] = (addr >> 16) & 0xFF;
+    cmd_buffer[2] = (addr >> 8) & 0xFF;
+    cmd_buffer[3] = addr & 0xFF;
+
+    // 3. 拉低片选，准备开始整个数据包的传输
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET);
+
+    // 4. 发送页编程命令和地址（这部分用轮询，很快）
+    HAL_SPI_Transmit(&hspi1, cmd_buffer, 4, HAL_MAX_DELAY);
+
+    // 5. 【关键】启动DMA传输数据，然后函数就返回了
+    //    CS会保持低电平，直到DMA在HAL_SPI_TxCpltCallback中完成
+    HAL_SPI_Transmit_DMA(&hspi1, buf, len);
+}
+
+/**
+ * @brief  可以处理跨页的通用DMA写入函数
+ * @param  startAddr: 写入的起始地址
+ * @param  data: 要写入的数据缓冲区
+ * @param  totalLen: 要写入的总长度
+ * @note   重要：调用此函数前，必须确保目标区域已被擦除！
+ * @retval None
+ */
+void SPI_Flash_WriteData_CrossPage_DMA(uint32_t startAddr, uint8_t* data, uint32_t totalLen)
+{
+    uint32_t page_offset;
+    uint16_t bytes_to_write_now;
+    uint8_t* data_ptr = data;
+    uint32_t current_addr = startAddr;
+
+    while(totalLen > 0)
+    {
+        // 计算当前页的偏移量和剩余空间
+        page_offset = current_addr % FLASH_PAGE_SIZE;
+        uint16_t space_left_in_page = FLASH_PAGE_SIZE - page_offset;
+
+        // 决定本次写入多少字节
+        if (totalLen < space_left_in_page) {
+            bytes_to_write_now = totalLen;
+        } else {
+            bytes_to_write_now = space_left_in_page;
+        }
+
+        // 启动一次DMA页写入
+        SPI_Flash_PageWrite_DMA(current_addr, data_ptr, bytes_to_write_now);
+        spi_tx_busy_flag = 1; // 标记SPI忙碌
+
+        // 【关键】等待DMA传输完成、CS拉高、Flash写入完成
+        // 这个标志位将在 HAL_SPI_TxCpltCallback 中被清除
+        while(spi_tx_busy_flag) {
+            // 在这里可以加入看门狗喂狗等操作
+        }
+
+        // 更新指针、地址和剩余长度，为下一次写入做准备
+        current_addr += bytes_to_write_now;
+        data_ptr += bytes_to_write_now;
+        totalLen -= bytes_to_write_now;
+    }
+}
+
+
+/**
+ * @brief  UART接收完成回调函数
+ * @param  huart: UART句柄指针
+ * @retval None
+ *//*
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if(huart->Instance == USART1)
+  {
+    // 4KB数据已经通过DMA全部接收到data_buffer中了
+    uart_rx_complete_flag = 1;
+  }
+}*/
+
+/**
+ * @brief  SPI DMA传输完成回调函数
+ * @param  hspi: SPI句柄指针
+ * @retval None
+ */
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    // 检查是否是我们使用的SPI1
+    if(hspi->Instance == SPI1)
+    {
+        // 1. 【关键】DMA数据传输已完成，现在可以拉高片选了
+        HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+
+        // 2. 【关键】等待Flash芯片内部写入操作完成
+        SPI_Flash_WaitForWriteEnd();
+
+        // 3. 清除我们自己的忙碌标志，让主循环可以继续
+        spi_tx_busy_flag = 0;
+    }
+}
+
+/*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 等待写/擦除操作完成
 void SPI_Flash_WaitForWriteEnd(void)
 {
@@ -104,7 +247,7 @@ void SPI_Flash_WaitForWriteEnd(void)
         HAL_SPI_Receive(&hspi1, &status, 1, HAL_MAX_DELAY);
     } while ((status & 0x01) == 0x01); // 检查BUSY位(bit 0)是否为0
     FLASH_CS_HIGH();
-}
+}*/
 
 // 写使能
 void SPI_Flash_WriteEnable(void)
@@ -207,6 +350,173 @@ void SPI_Flash_WriteData_CrossPage(uint32_t startAddr, uint8_t* data, uint32_t t
         totalLen -= bytes_to_write_now;
     }
 }
+
+/**
+ * @brief  等待Flash芯片不忙
+ * @param  None
+ * @retval None
+ */
+void SPI_Flash_WaitForWriteEnd(void)
+{
+    uint8_t status = 0;
+    uint8_t cmd = 0x05; // Read Status Register 1 指令
+
+    do
+    {
+        // 1. 拉低片选
+        HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET);
+
+        // 2. 发送读状态命令
+        HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
+
+        // 3. 读取状态字节
+        HAL_SPI_Receive(&hspi1, &status, 1, HAL_MAX_DELAY);
+
+        // 4. 拉高片选
+        HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+
+    } while ((status & 0x01) == 0x01); // 检查BUSY位（位0），如果为1，则继续等待
+}
+
+/**
+ * @brief  用最基础的轮询方式写入一页数据（不超过256字节）
+ * @param  addr: Flash起始地址
+ * @param  buf: 数据缓冲区指针
+ * @param  len:  要写入的数据长度 (必须 <= 256)
+ * @retval None
+ */
+void SPI_Flash_WriteData_Simple(uint32_t addr, uint8_t* buf, uint16_t len)
+{
+    uint8_t cmd_buffer[4];
+    uint8_t write_enable_cmd = 0x06; // Write Enable 指令
+
+    // 1. 发送写使能命令
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_Transmit(&hspi1, &write_enable_cmd, 1, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+
+    // 2. 发送页编程命令 (0x02) + 地址 + 数据
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET);
+
+    cmd_buffer[0] = 0x02; // Page Program指令
+    cmd_buffer[1] = (addr >> 16) & 0xFF;
+    cmd_buffer[2] = (addr >> 8) & 0xFF;
+    cmd_buffer[3] = addr & 0xFF;
+    HAL_SPI_Transmit(&hspi1, cmd_buffer, 4, HAL_MAX_DELAY);
+
+    // 发送数据
+    HAL_SPI_Transmit(&hspi1, buf, len, HAL_MAX_DELAY);
+
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+
+    // 3. 【关键】等待写入完成
+    SPI_Flash_WaitForWriteEnd();
+}
+
+/**
+ * @brief  用最基础的轮询方式擦除一个扇区（4KB）
+ * @param  addr: 扇区内任意地址
+ * @retval None
+ */
+void SPI_Flash_SectorErase_Simple(uint32_t addr)
+{
+    uint8_t cmd_buffer[4];
+    uint8_t write_enable_cmd = 0x06; // Write Enable 指令
+
+    // 1. 发送写使能命令
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_Transmit(&hspi1, &write_enable_cmd, 1, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+
+    // 2. 发送扇区擦除命令 (0x20) + 地址
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET);
+    cmd_buffer[0] = 0x20; // Sector Erase指令
+    cmd_buffer[1] = (addr >> 16) & 0xFF;
+    cmd_buffer[2] = (addr >> 8) & 0xFF;
+    cmd_buffer[3] = addr & 0xFF;
+    HAL_SPI_Transmit(&hspi1, cmd_buffer, 4, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+
+    // 3. 【关键】等待擦除完成（这需要几百毫秒！）
+    SPI_Flash_WaitForWriteEnd();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * @brief  用最基础的轮询方式读取Flash数据，用于调试
+ * @param  addr: Flash起始地址
+ * @param  len:  要读取的数据长度
+ * @retval None
+ * @note   此函数会直接通过UART打印读回的每个字节的十六进制值
+ */
+void SPI_Flash_ReadData_Simple(uint32_t addr, uint16_t len)
+{
+    uint8_t cmd_buffer[4];
+    uint8_t dummy_byte = 0x00; // 【修正1】定义并初始化一个用于发送的空字节
+    uint8_t rx_byte;
+    uint16_t i;
+
+    // 1. 拉低片选，开始通信
+    // 【修正2】使用你自己在main.h中找到的宏名
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET);
+
+    // 2. 发送读取命令 (0x03) 和24位地址
+    cmd_buffer[0] = 0x03; // Read Data指令
+    cmd_buffer[1] = (addr >> 16) & 0xFF; // 24位地址
+    cmd_buffer[2] = (addr >> 8) & 0xFF;
+    cmd_buffer[3] = addr & 0xFF;
+    
+    // 发送命令和地址
+    HAL_SPI_Transmit(&hspi1, cmd_buffer, 4, HAL_MAX_DELAY);
+
+    // 3. 循环读取数据
+    for (i = 0; i < len; i++)
+    {
+        // 发送一个Dummy字节 (0x00) 以产生时钟，同时接收一个字节
+        HAL_SPI_TransmitReceive(&hspi1, &dummy_byte, &rx_byte, 1, HAL_MAX_DELAY);
+
+        // 【关键】将读到的字节直接以十六进制格式通过UART发送出来
+        char hex_str[4];
+        snprintf(hex_str, sizeof(hex_str), "%02X ", rx_byte); // 格式化为 "XX "
+        HAL_UART_Transmit(&huart1, (uint8_t*)hex_str, 3, HAL_MAX_DELAY);
+    }
+
+    // 4. 拉高片选，结束通信
+    // 【修正2】使用你自己在main.h中找到的宏名
+    HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* USER CODE END 0 */
 
 /**
@@ -238,10 +548,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_SPI1_Init();
-  MX_FATFS_Init();
   MX_TIM4_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
@@ -344,16 +654,25 @@ SPI_Flash_ReadData(flash_Address, read_Buffer, sizeof(read_Buffer));
 // 你可以通过设置断点查看read_Buffer的值，或者通过串口打印出来
 */
 
+  // 启动UART DMA接收，准备接收最多BUFFER_SIZE字节的数据
+HAL_UART_Receive_DMA(&huart1, data_buffer, BUFFER_SIZE);
+
+// 【关键】使能UART空闲中断
+__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {	
+		//HAL_UART_Transmit(&huart1, verify_buffer, BUFFER_SIZE, HAL_MAX_DELAY);
+		
+		
 		static uint16_t encoder=0;
 		static uint16_t last_encoder=0;
 		encoder=__HAL_TIM_GET_COUNTER(&htim4);
 		int delta=encoder-last_encoder;
+		if(delta>1000||delta<-1000)delta=0;
 		last_encoder=encoder;
 		if(func==0){volume+=delta/4;}
 		if(func==1){pitch+=delta/4;}
@@ -386,6 +705,38 @@ SPI_Flash_ReadData(flash_Address, read_Buffer, sizeof(read_Buffer));
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+		 if (uart_rx_idle_flag && (spi_tx_busy_flag == 0))
+    {
+        // 1. 清除标志位
+        uart_rx_idle_flag = 0;
+
+        // 2. 擦除Flash的对应扇区
+      //  SPI_Flash_SectorErase(current_flash_addr); 
+			SPI_Flash_SectorErase_Simple(current_flash_addr); 
+
+        // 3. 启动跨页DMA写入，写入实际接收到的长度
+        SPI_Flash_WriteData_CrossPage_DMA(current_flash_addr, data_buffer, uart_rx_len);
+
+        // --- 验证逻辑：读取并发送 ---
+        //SPI_Flash_ReadData(current_flash_addr, verify_buffer, uart_rx_len);
+			SPI_Flash_ReadData_Simple(current_flash_addr, uart_rx_len);
+
+        uint8_t msg[] = "\r\n--- Flash Verified. Echoing back ---\r\n";
+        HAL_UART_Transmit(&huart1, msg, sizeof(msg) - 1, HAL_MAX_DELAY);
+
+        // 发送读回的数据，长度是实际接收的长度
+        HAL_UART_Transmit(&huart1, verify_buffer, uart_rx_len, HAL_MAX_DELAY);
+
+        // --- 准备下一次接收 ---
+        current_flash_addr += uart_rx_len;
+        if (current_flash_addr >= (1 * 1024 * 1024)) {
+            current_flash_addr = 0;
+        }
+
+        // 重新启动UART DMA接收，并使能空闲中断
+        HAL_UART_Receive_DMA(&huart1, data_buffer, BUFFER_SIZE);
+        __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+    }
   }
   /* USER CODE END 3 */
 }
