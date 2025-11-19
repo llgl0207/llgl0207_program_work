@@ -31,17 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-// --- 【共享宏定义】 ---
-#define BUFFER_SIZE 4096
 
-// --- 【共享变量声明】 ---
-// 注意这里用的是 extern，意思是“声明”，告诉编译器变量在别处定义
-extern uint8_t data_buffer[BUFFER_SIZE];
-extern uint8_t verify_buffer[BUFFER_SIZE];
-extern volatile uint16_t uart_rx_len;
-extern volatile uint8_t uart_rx_idle_flag;
-extern volatile uint8_t spi_tx_busy_flag;
-extern uint32_t current_flash_addr;
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

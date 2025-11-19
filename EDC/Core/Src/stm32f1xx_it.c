@@ -51,7 +51,9 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+#define RXSIZE  1024
+uint8_t rx_buffer[RXSIZE] = {0};
+uint16_t RxNum = 0;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -59,6 +61,7 @@ extern DMA_HandleTypeDef hdma_spi1_tx;
 extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim3;
 extern DMA_HandleTypeDef hdma_usart1_rx;
+extern DMA_HandleTypeDef hdma_usart1_tx;
 extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
 
@@ -217,6 +220,20 @@ void DMA1_Channel3_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles DMA1 channel4 global interrupt.
+  */
+void DMA1_Channel4_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Channel4_IRQn 0 */
+
+  /* USER CODE END DMA1_Channel4_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_usart1_tx);
+  /* USER CODE BEGIN DMA1_Channel4_IRQn 1 */
+
+  /* USER CODE END DMA1_Channel4_IRQn 1 */
+}
+
+/**
   * @brief This function handles DMA1 channel5 global interrupt.
   */
 void DMA1_Channel5_IRQHandler(void)
@@ -278,22 +295,7 @@ void SPI1_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-	 /* 【新增】处理UART空闲中断 */
-  if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) != RESET)
-  {
-    // 1. 清除空闲中断标志位（必须先读SR再读DR）
-    __HAL_UART_CLEAR_IDLEFLAG(&huart1);
-    
-    // 2. 停止当前的DMA传输
-    HAL_UART_DMAStop(&huart1);
-    
-    // 3. 计算接收到了多少数据
-    //    总长度 - DMA剩余未传输的长度 = 已接收的长度
-    uart_rx_len = BUFFER_SIZE - __HAL_DMA_GET_COUNTER(&hdma_usart1_rx);
-    
-    // 4. 设置标志位，通知主循环数据处理
-    uart_rx_idle_flag = 1;
-  }
+	
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */

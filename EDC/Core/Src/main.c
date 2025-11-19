@@ -52,30 +52,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-//#define BUFFER_SIZE 4096 // 4KB, 正好是一个扇区的大小// BUFFER_SIZE 宏定义已移至 main.h
-
-// 主要的数据缓冲区，用于UART接收
-uint8_t data_buffer[BUFFER_SIZE];
-
-// 【新增】验证缓冲区，用于存放从Flash读回的数据
-uint8_t verify_buffer[BUFFER_SIZE];
-
-// 【新增】用于记录实际接收到的数据长度
-volatile uint16_t uart_rx_len = 0;
-
-// SPI DMA发送时使用的临时缓冲区，用于存放“指令+地址+数据”
-uint8_t dma_tx_buffer[4 + FLASH_PAGE_SIZE]; // 最大4字节指令+256字节数据
-
-// 状态标志位，使用 uint8_t 代替 bool (0=FALSE, 1=TRUE)
-volatile uint8_t uart_rx_idle_flag = 0; // 改为空闲标志
-volatile uint8_t spi_tx_busy_flag = 0;
-
-// Flash地址管理
-uint32_t current_flash_addr = 0;
-
-
-
-
 uint16_t volume =80;
 uint8_t pitch =60;
 uint32_t last_interrupt_time=0;
@@ -100,8 +76,7 @@ uint8_t Music_Score[LENGTH]={55,62,55,62,55,62,55,57,57,64,57,64,57,64,57,59,59,
 uint8_t datt[18]={0};
 	
 	
-	
-	
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -390,11 +365,6 @@ SPI_Flash_ReadData(flash_Address, read_Buffer, sizeof(read_Buffer));
 // 你可以通过设置断点查看read_Buffer的值，或者通过串口打印出来
 */
 
-  // 启动UART DMA接收，准备接收最多BUFFER_SIZE字节的数据
-HAL_UART_Receive_DMA(&huart1, data_buffer, BUFFER_SIZE);
-
-// 【关键】使能UART空闲中断
-__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -598,6 +568,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     // ���磺ÿ1msִ��һ��
   }
 }
+
+
 /* USER CODE END 4 */
 
 /**
