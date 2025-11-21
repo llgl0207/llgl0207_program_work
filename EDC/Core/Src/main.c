@@ -473,7 +473,22 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 				
 			}
     }
+	if(GPIO_Pin == KEY_UP_Pin)
+  {
+		 uint32_t current_time = HAL_GetTick();//获取当前时间用于按键消抖
+
+
+    if(current_time - last_interrupt_time > 100)//判断当前时间与上一次中断触发时间的间隔是否大于50ms，用于消抖
+    {
+			//=======================================EXTI=========================================
+      //there are codes which will be activated when the EXTI happened.
+				HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_13);
+				
+				
+			}
+    }
     last_interrupt_time = current_time;//更新上一次中断触发时间
+		
     // 2. 在这里写你的中断处理代码
     
     // --- 示例：翻转一个LED ---
