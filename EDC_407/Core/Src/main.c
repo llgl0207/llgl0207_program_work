@@ -108,7 +108,7 @@ HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2048);
   {
 		for(int i=0;i<4096;i+=128){
 			HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, i);
-			HAL_Delay(1);
+			HAL_Delay(100);
 		}
 		//HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 		//HAL_Delay(1000);
