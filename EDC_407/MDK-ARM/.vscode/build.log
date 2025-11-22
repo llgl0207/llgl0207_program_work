@@ -1,0 +1,21 @@
+*** Using Compiler 'V5.06 update 6 (build 750)', folder: 'D:\Program Files\Keil_v5\ARM\ARMCC\Bin'
+Build target 'EDC_407'
+compiling main.c...
+../Core/Src/main.c(103): warning:  #223-D: function "DRAW_Init" declared implicitly
+    DRAW_Init(1000); 
+../Core/Src/main.c(106): warning:  #223-D: function "DRAW_AddString" declared implicitly
+    DRAW_AddString("HELLO", 200, 0, 3000, 50, 50);
+../Core/Src/main.c(176): warning:  #223-D: function "DRAW_TimerStep" declared implicitly
+    DRAW_TimerStep(htim);
+../Core/Src/main.c: 3 warnings, 0 errors
+compiling draw.c...
+../Core/Src/draw.c(65): warning:  #550-D: variable "switch_interval"  was set but never used
+  static uint32_t switch_interval = 1000;
+../Core/Src/draw.c(66): warning:  #177-D: variable "last_switch_tick"  was declared but never referenced
+  static uint32_t last_switch_tick = 0;
+../Core/Src/draw.c: 2 warnings, 0 errors
+linking...
+Program Size: Code=12332 RO-data=1380 RW-data=76 ZI-data=2428  
+FromELF: creating hex file...
+"EDC_407\EDC_407.axf" - 0 Error(s), 5 Warning(s).
+Build Time Elapsed:  00:00:02

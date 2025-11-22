@@ -21,17 +21,20 @@ Target DLL:      CMSIS_AGDI.dll V1.30.6.0
 Dialog DLL:      TCM.DLL V1.36.1.0
  
 <h2>Project:</h2>
-e:\github\llgl0207_program_work\EDC_407\MDK-ARM\EDC_407.uvprojx
+E:\github\llgl0207_program_work\EDC_407\MDK-ARM\EDC_407.uvprojx
 Project File Date:  11/22/2025
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 6 (build 750)', folder: 'D:\Program Files\Keil_v5\ARM\ARMCC\Bin'
 Build target 'EDC_407'
-compiling main.c...
+compiling draw.c...
+../Core/Src/draw.c(83): warning:  #550-D: variable "switch_interval"  was set but never used
+  static uint32_t switch_interval = 1000;
+../Core/Src/draw.c: 1 warning, 0 errors
 linking...
-Program Size: Code=10818 RO-data=1274 RW-data=148 ZI-data=2012  
+Program Size: Code=13336 RO-data=1752 RW-data=72 ZI-data=2424  
 FromELF: creating hex file...
-"EDC_407\EDC_407.axf" - 0 Error(s), 0 Warning(s).
+"EDC_407\EDC_407.axf" - 0 Error(s), 1 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -54,7 +57,7 @@ Package Vendor: Keil
 <h2>Collection of Component Files used:</h2>
 
    * Component: ARM::CMSIS:CORE:5.1.2
-Build Time Elapsed:  00:00:03
+Build Time Elapsed:  00:00:02
 </pre>
 </body>
 </html>

@@ -393,6 +393,11 @@
           <GroupName>Application/User/Core</GroupName>
           <Files>
             <File>
+              <FileName>draw.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/draw.c</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/main.c</FilePath>

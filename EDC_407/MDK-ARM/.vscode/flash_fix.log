@@ -1,0 +1,4 @@
+Load "EDC_407\\EDC_407.axf" 
+Erase Done.Programming Failed!RDDI-DAP Error
+Error: Flash Download failed  -  "Cortex-M4"
+Flash Load finished at 14:17:13

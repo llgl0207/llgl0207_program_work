@@ -45,3 +45,5 @@ edc_407\main.o: ../Core/Inc/tim.h
 edc_407\main.o: ../Core/Inc/usart.h
 edc_407\main.o: ../Core/Inc/gpio.h
 edc_407\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+edc_407\main.o: ../Core/Inc/draw.h
+edc_407\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h

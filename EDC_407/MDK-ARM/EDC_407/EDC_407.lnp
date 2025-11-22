@@ -1,5 +1,6 @@
 --cpu=Cortex-M4.fp
 "edc_407\startup_stm32f407xx.o"
+"edc_407\draw.o"
 "edc_407\main.o"
 "edc_407\gpio.o"
 "edc_407\can.o"
