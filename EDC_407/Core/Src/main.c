@@ -79,13 +79,154 @@ static const uint16_t pattern_C[][4] = {
   {1200, 3200, 2000, 3800},
   {2000, 3800, 3000, 3600}
 };
+// 以下为 D..Z 的简单线段表示（每个字母用了若干条线）
+static const uint16_t pattern_D[][4] = {
+  {1200, 800, 1200, 3800},
+  {1200, 800, 2200, 1200},
+  {2200, 1200, 2600, 2000},
+  {2600, 2000, 2200, 3000},
+  {2200, 3000, 1200, 3200}
+};
+static const uint16_t pattern_E[][4] = {
+  {1200, 800, 1200, 3800},
+  {1200, 800, 3000, 800},
+  {1200, 2300, 2600, 2300},
+  {1200, 3800, 3000, 3800}
+};
+static const uint16_t pattern_F[][4] = {
+  {1200, 3295, 1200, 295},
+  {1200, 3295, 3000, 3295},
+  {1200, 1795, 2600, 1795}
+};
+static const uint16_t pattern_G[][4] = {
+  {3000, 1200, 2000, 800},
+  {2000, 800, 1200, 1400},
+  {1200, 1400, 1000, 2600},
+  {1000, 2600, 1200, 3200},
+  {1200, 3200, 2200, 3800},
+  {2200, 3800, 3000, 3600},
+  {2500, 2500, 3000, 2500}
+};
+static const uint16_t pattern_H[][4] = {
+  {1200, 800, 1200, 3800},
+  {3000, 800, 3000, 3800},
+  {1200, 2300, 3000, 2300}
+};
+static const uint16_t pattern_I[][4] = {
+  {2000, 800, 2800, 800},
+  {2400, 800, 2400, 3800},
+  {2000, 3800, 2800, 3800}
+};
+static const uint16_t pattern_J[][4] = {
+  {1400, 3295, 3400, 3295},
+  {2400, 3295, 2400, 1095},
+  {2400, 1095, 2000, 495}
+};
+static const uint16_t pattern_K[][4] = {
+  {1200, 800, 1200, 3800},
+  {3000, 800, 1200, 2300},
+  {1200, 2300, 3000, 3800}
+};
+static const uint16_t pattern_L[][4] = {
+  {1200, 3295, 1200, 295},
+  {1200, 295, 3000, 295}
+};
+static const uint16_t pattern_M[][4] = {
+  {1200, 3295, 1200, 295},
+  {1200, 3295, 2200, 2095},
+  {2200, 2095, 3000, 3295},
+  {3000, 3295, 3000, 295}
+};
+static const uint16_t pattern_N[][4] = {
+  {1200, 3295, 1200, 295},
+  {1200, 3295, 3000, 295},
+  {3000, 3295, 3000, 295}
+};
+static const uint16_t pattern_O[][4] = {
+  {2000, 3295, 3000, 2895},
+  {3000, 2895, 3200, 1495},
+  {3200, 1495, 2600, 495},
+  {2600, 495, 1600, 895},
+  {1600, 895, 1400, 2095},
+  {1400, 2095, 2000, 3295}
+};
+static const uint16_t pattern_P[][4] = {
+  {1200, 3295, 1200, 295},
+  {1200, 3295, 2600, 2995},
+  {2600, 2995, 1200, 2095}
+};
+static const uint16_t pattern_Q[][4] = {
+  {2000, 3295, 3000, 2895},
+  {3000, 2895, 3200, 1495},
+  {3200, 1495, 2600, 495},
+  {2600, 495, 1600, 895},
+  {1600, 895, 1400, 2095},
+  {1400, 2095, 2000, 3295},
+  {2500, 1095, 3200, 295}
+};
+static const uint16_t pattern_R[][4] = {
+  {1200, 3295, 1200, 295},
+  {1200, 3295, 2600, 2995},
+  {2600, 2995, 1200, 2095},
+  {1200, 2095, 3000, 295}
+};
+static const uint16_t pattern_S[][4] = {
+  {1024,0,3072,1024},
+  {3072,1024,1024,3072},
+  {1024,3072,3072,4096}
+};
+static const uint16_t pattern_T[][4] = {
+  {1400, 3295, 3400, 3295},
+  {2400, 3295, 2400, 295}
+};
+static const uint16_t pattern_U[][4] = {
+  {1200, 3295, 1200, 895},
+  {1200, 895, 2200, 295},
+  {2200, 295, 3200, 895},
+  {3200, 895, 3200, 3295}
+};
+static const uint16_t pattern_V[][4] = {
+  {1200, 3295, 2200, 295},
+  {2200, 295, 3200, 3295}
+};
+static const uint16_t pattern_W[][4] = {
+  {1200, 3295, 1600, 295},
+  {1600, 295, 2200, 2095},
+  {2200, 2095, 2800, 295},
+  {2800, 295, 3200, 3295}
+};
+static const uint16_t pattern_X[][4] = {
+  {1200, 3295, 3200, 295},
+  {3200, 3295, 1200, 295}
+};
+static const uint16_t pattern_Y[][4] = {
+  {1200, 3295, 2200, 1895},
+  {3200, 3295, 2200, 1895},
+  {2200, 1895, 2200, 295}
+};
+static const uint16_t pattern_Z[][4] = {
+  {1200, 3295, 3200, 3295},
+  {3200, 3295, 1200, 295},
+  {1200, 295, 3200, 295}
+};
 
-/* 模式表与状态变量（pattern_A/B/C 已在上面定义） */
-static const uint16_t (*patterns[])[4] = { pattern_A, pattern_B, pattern_C };
+/* 模式表与状态变量（A..Z） */
+static const uint16_t (*patterns[])[4] = {
+  pattern_A, pattern_B, pattern_C, pattern_D, pattern_E, pattern_F, pattern_G,
+  pattern_H, pattern_I, pattern_J, pattern_K, pattern_L, pattern_M, pattern_N,
+  pattern_O, pattern_P, pattern_Q, pattern_R, pattern_S, pattern_T, pattern_U,
+  pattern_V, pattern_W, pattern_X, pattern_Y, pattern_Z
+};
 static const uint8_t pattern_lengths[] = {
-  sizeof(pattern_A)/sizeof(pattern_A[0]),
-  sizeof(pattern_B)/sizeof(pattern_B[0]),
-  sizeof(pattern_C)/sizeof(pattern_C[0])
+  sizeof(pattern_A)/sizeof(pattern_A[0]), sizeof(pattern_B)/sizeof(pattern_B[0]), sizeof(pattern_C)/sizeof(pattern_C[0]),
+  sizeof(pattern_D)/sizeof(pattern_D[0]), sizeof(pattern_E)/sizeof(pattern_E[0]), sizeof(pattern_F)/sizeof(pattern_F[0]),
+  sizeof(pattern_G)/sizeof(pattern_G[0]), sizeof(pattern_H)/sizeof(pattern_H[0]), sizeof(pattern_I)/sizeof(pattern_I[0]),
+  sizeof(pattern_J)/sizeof(pattern_J[0]), sizeof(pattern_K)/sizeof(pattern_K[0]), sizeof(pattern_L)/sizeof(pattern_L[0]),
+  sizeof(pattern_M)/sizeof(pattern_M[0]), sizeof(pattern_N)/sizeof(pattern_N[0]), sizeof(pattern_O)/sizeof(pattern_O[0]),
+  sizeof(pattern_P)/sizeof(pattern_P[0]), sizeof(pattern_Q)/sizeof(pattern_Q[0]), sizeof(pattern_R)/sizeof(pattern_R[0]),
+  sizeof(pattern_S)/sizeof(pattern_S[0]), sizeof(pattern_T)/sizeof(pattern_T[0]), sizeof(pattern_U)/sizeof(pattern_U[0]),
+  sizeof(pattern_V)/sizeof(pattern_V[0]), sizeof(pattern_W)/sizeof(pattern_W[0]), sizeof(pattern_X)/sizeof(pattern_X[0]),
+  sizeof(pattern_Y)/sizeof(pattern_Y[0]), sizeof(pattern_Z)/sizeof(pattern_Z[0])
 };
 static uint8_t pattern_index = 0;
 const uint16_t (*current_pattern)[4];
