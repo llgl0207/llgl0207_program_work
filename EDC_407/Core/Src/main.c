@@ -51,42 +51,52 @@
 /* USER CODE BEGIN PV */
 
 uint8_t done=0;
-uint16_t (*current_Line)[4];
-#define queue_LENGTH 8
-// 4 个不重叠的 X，每个 X 用两条对角线表示（共 8 条线）
-// 中心分别位于 (512,512), (512,3072), (3072,512), (3072,3072)，半径 r=400
-uint16_t Draw_queue[queue_LENGTH][4] = {
-  {112, 112,  912,  912}, // X1 diag A
-  {112, 912,  912,  112}, // X1 diag B
-  {112, 2672, 912, 3472}, // X2 diag A
-  {112, 3472, 912, 2672}, // X2 diag B
-  {2672, 112, 3472,  912}, // X3 diag A
-  {2672, 912, 3472,  112}, // X3 diag B
-  {2672,2672, 3472, 3472}, // X4 diag A
-  {2672,3472, 3472, 2672}  // X4 diag B
+// 当前绘制行（指向当前模式的某一条线）
+const uint16_t (*current_Line)[4];
+
+// 定义 A/B/C 三个字母的线段集合（每行为 {x0,y0,x1,y1}）
+// 坐标范围为 0..4095（12-bit DAC）
+static const uint16_t pattern_A[][4] = {
+  {0,0,2048,4096},
+  {2048,4096,4096,0},
+  {1024,2048,3072,2048}
 };
-uint8_t Draw_queue_index=0;
+static const uint16_t pattern_B[][4] = {
+  {0,0,0,4096},
+  {0,4096,2048,4096},
+  {2048,4096,3072,3072},
+  {3072,3072,2048,2048},
+  {2048,2048,0,2048},
+  {2048,2048,3072,1024},
+  {3072,1024,2048,0},
+  {2048,0,0,0}
+};
+static const uint16_t pattern_C[][4] = {
+  {3000, 1000, 2000, 800},
+  {2000, 800, 1200, 1400},
+  {1200, 1400, 1000, 2600},
+  {1000, 2600, 1200, 3200},
+  {1200, 3200, 2000, 3800},
+  {2000, 3800, 3000, 3600}
+};
 
+/* 模式表与状态变量（pattern_A/B/C 已在上面定义） */
+static const uint16_t (*patterns[])[4] = { pattern_A, pattern_B, pattern_C };
+static const uint8_t pattern_lengths[] = {
+  sizeof(pattern_A)/sizeof(pattern_A[0]),
+  sizeof(pattern_B)/sizeof(pattern_B[0]),
+  sizeof(pattern_C)/sizeof(pattern_C[0])
+};
+static uint8_t pattern_index = 0;
+const uint16_t (*current_pattern)[4];
+static uint8_t current_pattern_length = 0;
+static uint8_t line_index = 0;
 
-
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
+/*
+ * @retval int
+ */
 void SystemClock_Config(void);
-/* USER CODE BEGIN PFP */
 
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
-
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
 int main(void)
 {
 
@@ -119,9 +129,12 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
-  /* 初始化当前绘制行，避免定时器回调中使用未初始化指针 */
-  current_Line = &Draw_queue[Draw_queue_index];
-	HAL_TIM_Base_Start_IT(&htim14);  // 启动TIM14中断
+  /* 初始化当前绘制模式与行，避免定时器回调中使用未初始化指针 */
+  current_pattern = patterns[pattern_index];
+  current_pattern_length = pattern_lengths[pattern_index];
+  line_index = 0;
+  current_Line = &current_pattern[line_index];
+  HAL_TIM_Base_Start_IT(&htim14);  // 启动TIM14中断
 HAL_DAC_Start(&hdac, DAC_CHANNEL_1); // ����DACͨ��1
 HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2048);
 HAL_DAC_Start(&hdac, DAC_CHANNEL_2 );// ����DACͨ��1
@@ -134,14 +147,25 @@ HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 2048);
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    
-		if(done==2){
-      Draw_queue_index = (Draw_queue_index + 1) % queue_LENGTH;
-      current_Line = &Draw_queue[Draw_queue_index];
+    /* 自动定时切换模式：每 interval_ms 毫秒切换到下一个字母 */
+    const uint32_t interval_ms = 1000; // ms
+    static uint32_t last_switch = 0;
+    uint32_t now = HAL_GetTick();
+    if((now - last_switch) >= interval_ms){
+      last_switch = now;
+      pattern_index = (pattern_index + 1) % (sizeof(patterns)/sizeof(patterns[0]));
+      current_pattern = patterns[pattern_index];
+      current_pattern_length = pattern_lengths[pattern_index];
+      line_index = 0;
+      current_Line = &current_pattern[line_index];
       done = 0;
     }
-		//HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
-		//HAL_Delay(1000);
+
+    if(done==2){
+      line_index = (line_index + 1) % current_pattern_length;
+      current_Line = &current_pattern[line_index];
+      done = 0;
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
