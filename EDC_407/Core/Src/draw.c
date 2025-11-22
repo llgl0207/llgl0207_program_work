@@ -46,13 +46,52 @@ static const Line_t pattern_7[] = { {1200,3295,3000,3295}, {3000,3295,3000,295} 
 static const Line_t pattern_8[] = { {1200,3295,3000,3295}, {3000,3295,3000,295}, {3000,295,1200,295}, {1200,295,1200,3295}, {1200,1795,3000,1795} };
 static const Line_t pattern_9[] = { {3000,295,3000,3295}, {3000,3295,1200,3295}, {1200,3295,1200,1795}, {1200,1795,3000,1795} };
 
+// Symbols
+static const Line_t pattern_excl[] = { {2100,3295,2100,1295}, {2100,795,2100,295} }; // !
+static const Line_t pattern_apos[] = { {2100,3295,2100,2295} }; // '
+static const Line_t pattern_hash[] = { {1600,3295,1600,295}, {2600,3295,2600,295}, {1200,2295,3000,2295}, {1200,1295,3000,1295} }; // #
+static const Line_t pattern_pct[] = { {1200,295,3000,3295}, {1400,3095,1600,3095}, {1600,3095,1600,2895}, {1600,2895,1400,2895}, {1400,2895,1400,3095}, {2600,695,2800,695}, {2800,695,2800,495}, {2800,495,2600,495}, {2600,495,2600,695} }; // % (simplified circles)
+static const Line_t pattern_caret[] = { {1200,1795,2100,3295}, {2100,3295,3000,1795} }; // ^
+static const Line_t pattern_ast[] = { {1200,2795,3000,795}, {3000,2795,1200,795}, {2100,3295,2100,295}, {1200,1795,3000,1795} }; // *
+static const Line_t pattern_under[] = { {1200,295,3000,295} }; // _
+static const Line_t pattern_minus[] = { {1200,1795,3000,1795} }; // -
+static const Line_t pattern_plus[] = { {2100,3295,2100,295}, {1200,1795,3000,1795} }; // +
+static const Line_t pattern_eq[] = { {1200,2295,3000,2295}, {1200,1295,3000,1295} }; // =
+static const Line_t pattern_bslash[] = { {1200,3295,3000,295} }; // \ (backslash)
+static const Line_t pattern_fslash[] = { {1200,295,3000,3295} }; // /
+static const Line_t pattern_lparen[] = { {2600,3295,1600,1795}, {1600,1795,2600,295} }; // (
+static const Line_t pattern_rparen[] = { {1600,3295,2600,1795}, {2600,1795,1600,295} }; // )
+static const Line_t pattern_lbrack[] = { {2600,3295,1600,3295}, {1600,3295,1600,295}, {1600,295,2600,295} }; // [
+static const Line_t pattern_rbrack[] = { {1600,3295,2600,3295}, {2600,3295,2600,295}, {2600,295,1600,295} }; // ]
+static const Line_t pattern_lbrace[] = { {2600,3295,2100,3295}, {2100,3295,2100,1795}, {2100,1795,1600,1795}, {2100,1795,2100,295}, {2100,295,2600,295} }; // {
+static const Line_t pattern_rbrace[] = { {1600,3295,2100,3295}, {2100,3295,2100,1795}, {2100,1795,2600,1795}, {2100,1795,2100,295}, {2100,295,1600,295} }; // }
+static const Line_t pattern_quote[] = { {1600,3295,1600,2295}, {2600,3295,2600,2295} }; // "
+static const Line_t pattern_semi[] = { {2100,3295,2100,2795}, {2100,1295,1700,295} }; // ; (dot + line)
+static const Line_t pattern_colon[] = { {2100,3295,2100,2295}, {2100,1295,2100,295} }; // :
+static const Line_t pattern_comma[] = { {2100,495,2100,295}, {2100,295,1700,95} }; // ,
+static const Line_t pattern_period[] = { {1900,495,2300,495}, {2300,495,2300,295}, {2300,295,1900,295}, {1900,295,1900,495} }; // .
+static const Line_t pattern_question[] = { {1200,2595,1200,2995}, {1200,2995,1800,3295}, {1800,3295,2400,3295}, {2400,3295,3000,2995}, {3000,2995,3000,2295}, {3000,2295,2100,1595}, {2100,1595,2100,1095}, {2100,595,2100,295} }; // ?
+static const Line_t pattern_at[] = { {2600,1295,2200,1295}, {2200,1295,1800,1695}, {1800,1695,1800,2095}, {1800,2095,2200,2495}, {2200,2495,2600,2095}, {2600,2095,2600,1695}, {2600,1695,3000,1295}, {3000,1295,3000,2895}, {3000,2895,1400,2895}, {1400,2895,1400,895}, {1400,895,3000,895} }; // @
+static const Line_t pattern_dollar[] = { {2600,3295,1600,3295}, {1600,3295,1600,2095}, {1600,2095,2600,2095}, {2600,2095,2600,895}, {2600,895,1600,895}, {2100,3695,2100,495} }; // $
+static const Line_t pattern_lt[] = { {2600,3295,1200,1795}, {1200,1795,2600,295} }; // <
+static const Line_t pattern_gt[] = { {1200,3295,2600,1795}, {2600,1795,1200,295} }; // >
+static const Line_t pattern_pipe[] = { {2100,3295,2100,295} }; // |
+static const Line_t pattern_tilde[] = { {1200,1295,1600,2295}, {1600,2295,2200,1295}, {2200,1295,2600,2295} }; // ~
+
 static const Line_t * const patterns[] = {
   pattern_A, pattern_B, pattern_C, pattern_D, pattern_E, pattern_F, pattern_G,
   pattern_H, pattern_I, pattern_J, pattern_K, pattern_L, pattern_M, pattern_N,
   pattern_O, pattern_P, pattern_Q, pattern_R, pattern_S, pattern_T, pattern_U,
   pattern_V, pattern_W, pattern_X, pattern_Y, pattern_Z,
   pattern_0, pattern_1, pattern_2, pattern_3, pattern_4,
-  pattern_5, pattern_6, pattern_7, pattern_8, pattern_9
+  pattern_5, pattern_6, pattern_7, pattern_8, pattern_9,
+  pattern_excl, pattern_apos, pattern_hash, pattern_pct, pattern_caret,
+  pattern_ast, pattern_under, pattern_minus, pattern_plus, pattern_eq,
+  pattern_bslash, pattern_fslash, pattern_lparen, pattern_rparen,
+  pattern_lbrack, pattern_rbrack, pattern_lbrace, pattern_rbrace,
+  pattern_quote, pattern_semi, pattern_colon,
+  pattern_comma, pattern_period, pattern_question,
+  pattern_at, pattern_dollar, pattern_lt, pattern_gt, pattern_pipe, pattern_tilde
 };
 static const uint8_t pattern_lengths[] = {
   sizeof(pattern_A)/sizeof(pattern_A[0]), sizeof(pattern_B)/sizeof(pattern_B[0]), sizeof(pattern_C)/sizeof(pattern_C[0]),
@@ -67,7 +106,17 @@ static const uint8_t pattern_lengths[] = {
   sizeof(pattern_0)/sizeof(pattern_0[0]), sizeof(pattern_1)/sizeof(pattern_1[0]), sizeof(pattern_2)/sizeof(pattern_2[0]),
   sizeof(pattern_3)/sizeof(pattern_3[0]), sizeof(pattern_4)/sizeof(pattern_4[0]), sizeof(pattern_5)/sizeof(pattern_5[0]),
   sizeof(pattern_6)/sizeof(pattern_6[0]), sizeof(pattern_7)/sizeof(pattern_7[0]), sizeof(pattern_8)/sizeof(pattern_8[0]),
-  sizeof(pattern_9)/sizeof(pattern_9[0])
+  sizeof(pattern_9)/sizeof(pattern_9[0]),
+  sizeof(pattern_excl)/sizeof(pattern_excl[0]), sizeof(pattern_apos)/sizeof(pattern_apos[0]), sizeof(pattern_hash)/sizeof(pattern_hash[0]),
+  sizeof(pattern_pct)/sizeof(pattern_pct[0]), sizeof(pattern_caret)/sizeof(pattern_caret[0]), sizeof(pattern_ast)/sizeof(pattern_ast[0]),
+  sizeof(pattern_under)/sizeof(pattern_under[0]), sizeof(pattern_minus)/sizeof(pattern_minus[0]), sizeof(pattern_plus)/sizeof(pattern_plus[0]),
+  sizeof(pattern_eq)/sizeof(pattern_eq[0]), sizeof(pattern_bslash)/sizeof(pattern_bslash[0]), sizeof(pattern_fslash)/sizeof(pattern_fslash[0]),
+  sizeof(pattern_lparen)/sizeof(pattern_lparen[0]), sizeof(pattern_rparen)/sizeof(pattern_rparen[0]), sizeof(pattern_lbrack)/sizeof(pattern_lbrack[0]),
+  sizeof(pattern_rbrack)/sizeof(pattern_rbrack[0]), sizeof(pattern_lbrace)/sizeof(pattern_lbrace[0]), sizeof(pattern_rbrace)/sizeof(pattern_rbrace[0]),
+  sizeof(pattern_quote)/sizeof(pattern_quote[0]), sizeof(pattern_semi)/sizeof(pattern_semi[0]), sizeof(pattern_colon)/sizeof(pattern_colon[0]),
+  sizeof(pattern_comma)/sizeof(pattern_comma[0]), sizeof(pattern_period)/sizeof(pattern_period[0]), sizeof(pattern_question)/sizeof(pattern_question[0]),
+  sizeof(pattern_at)/sizeof(pattern_at[0]), sizeof(pattern_dollar)/sizeof(pattern_dollar[0]), sizeof(pattern_lt)/sizeof(pattern_lt[0]),
+  sizeof(pattern_gt)/sizeof(pattern_gt[0]), sizeof(pattern_pipe)/sizeof(pattern_pipe[0]), sizeof(pattern_tilde)/sizeof(pattern_tilde[0])
 };
 static const uint8_t patterns_count = sizeof(patterns)/sizeof(patterns[0]);
 
@@ -121,13 +170,46 @@ static void compute_pattern_minmax_x(const Line_t *p, uint8_t len, int32_t *minx
   *minx = mn; *maxx = mx;
 }
 
-// Set pattern by character (A-Z, 0-9). returns 1 if set, 0 otherwise
+// Set pattern by character (A-Z, 0-9, symbols). returns 1 if set, 0 otherwise
 static uint8_t set_pattern_by_char(char c){
   uint8_t idx = 255;
   if(c>='A' && c<='Z'){
     idx = (uint8_t)(c - 'A');
   } else if(c>='0' && c<='9'){
     idx = (uint8_t)(c - '0') + 26;
+  } else {
+    switch(c){
+      case '!': idx = 36; break;
+      case '\'': idx = 37; break;
+      case '#': idx = 38; break;
+      case '%': idx = 39; break;
+      case '^': idx = 40; break;
+      case '*': idx = 41; break;
+      case '_': idx = 42; break;
+      case '-': idx = 43; break;
+      case '+': idx = 44; break;
+      case '=': idx = 45; break;
+      case '\\': idx = 46; break;
+      case '/': idx = 47; break;
+      case '(': idx = 48; break;
+      case ')': idx = 49; break;
+      case '[': idx = 50; break;
+      case ']': idx = 51; break;
+      case '{': idx = 52; break;
+      case '}': idx = 53; break;
+      case '"': idx = 54; break;
+      case ';': idx = 55; break;
+      case ':': idx = 56; break;
+      case ',': idx = 57; break;
+      case '.': idx = 58; break;
+      case '?': idx = 59; break;
+      case '@': idx = 60; break;
+      case '$': idx = 61; break;
+      case '<': idx = 62; break;
+      case '>': idx = 63; break;
+      case '|': idx = 64; break;
+      case '~': idx = 65; break;
+    }
   }
   
   if(idx < patterns_count){
@@ -193,8 +275,15 @@ uint8_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y, ui
       current_obj_idx = slot;
       current_char_idx = 0;
       current_char_x = x;
-      if(draw_pool[slot].text[0]){
-          if(set_pattern_by_char(draw_pool[slot].text[0])){
+      
+      // Handle leading spaces
+      while(draw_pool[slot].text[current_char_idx] == ' '){
+           current_char_x += (2000 * (int32_t)sx) / 100 + spacing;
+           current_char_idx++;
+      }
+
+      if(draw_pool[slot].text[current_char_idx]){
+          if(set_pattern_by_char(draw_pool[slot].text[current_char_idx])){
              int32_t minx, maxx;
              compute_pattern_minmax_x(current_pattern, current_pattern_length, &minx, &maxx);
              int32_t left_offset = current_char_x - (minx * (int32_t)sx) / 100;
@@ -287,6 +376,12 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
         // 2. Advance index
         current_char_idx++;
         
+        // Handle spaces
+        while(current_char_idx < MAX_STR_LEN && draw_pool[current_obj_idx].text[current_char_idx] == ' '){
+             current_char_x += (2000 * (int32_t)draw_pool[current_obj_idx].sx) / 100 + draw_pool[current_obj_idx].spacing;
+             current_char_idx++;
+        }
+        
         // 3. Check end of string
         if(current_char_idx >= MAX_STR_LEN || draw_pool[current_obj_idx].text[current_char_idx] == '\0'){
             // Object finished. Find next active object.
@@ -305,6 +400,12 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
                 current_obj_idx = found;
                 current_char_idx = 0;
                 current_char_x = draw_pool[found].x;
+                
+                // Handle leading spaces for next object
+                while(draw_pool[found].text[current_char_idx] == ' '){
+                     current_char_x += (2000 * (int32_t)draw_pool[found].sx) / 100 + draw_pool[found].spacing;
+                     current_char_idx++;
+                }
             } else {
                 // No active objects? Should not happen if we are here.
                 current_obj_idx = -1;

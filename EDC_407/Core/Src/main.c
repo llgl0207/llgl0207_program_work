@@ -114,20 +114,24 @@ int main(void)
   while (1)
   {
     // 1. 格式化变量到字符串
-    sprintf(buf, "%04d", count);
+    //sprintf(buf, "%04d", count);
     
     // 2. 清除旧的显示内容
     DRAW_Clear();
     
     // 3. 重新添加显示对象
-    DRAW_AddString("COUNT", 200, 0, 3000, 20, 20); // 静态标题
-    DRAW_AddString(buf, 200, 0, 1000, 20, 20);     // 动态数值
+    //DRAW_AddString("COUNT", 200, 0, 3000, 20, 20); // 静态标题
+    //DRAW_AddString(buf, 200, 0, 1000, 20, 20);     // 动态数值
     
-    // 4. 更新变量
-    count++;
-    if(count > 9999) count = 0;
+    // 4. 添加符号测试
+    DRAW_AddString("!#%*+-=/,:;.?", 100, 0, 500, 10, 10);
+    DRAW_AddString("@$<|>~", 100, 0, 0, 10, 10);
     
-    // 5. 延时刷新 (例如 200ms 更新一次)
+    // 5. 更新变量
+    //count++;
+    //if(count > 9999) count = 0;
+    
+    // 6. 延时刷新 (例如 200ms 更新一次)
     HAL_Delay(200);
     /* USER CODE END WHILE */
 
