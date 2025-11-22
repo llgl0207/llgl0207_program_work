@@ -22,12 +22,13 @@
 #include "dac.h"
 #include "i2c.h"
 #include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,6 +49,26 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+uint8_t done=0;
+uint16_t (*current_Line)[4];
+#define queue_LENGTH 8
+// 4 个不重叠的 X，每个 X 用两条对角线表示（共 8 条线）
+// 中心分别位于 (512,512), (512,3072), (3072,512), (3072,3072)，半径 r=400
+uint16_t Draw_queue[queue_LENGTH][4] = {
+  {112, 112,  912,  912}, // X1 diag A
+  {112, 912,  912,  112}, // X1 diag B
+  {112, 2672, 912, 3472}, // X2 diag A
+  {112, 3472, 912, 2672}, // X2 diag B
+  {2672, 112, 3472,  912}, // X3 diag A
+  {2672, 912, 3472,  112}, // X3 diag B
+  {2672,2672, 3472, 3472}, // X4 diag A
+  {2672,3472, 3472, 2672}  // X4 diag B
+};
+uint8_t Draw_queue_index=0;
+
+
+
 
 /* USER CODE END PV */
 
@@ -96,9 +117,16 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
+  MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
+  /* 初始化当前绘制行，避免定时器回调中使用未初始化指针 */
+  current_Line = &Draw_queue[Draw_queue_index];
+	HAL_TIM_Base_Start_IT(&htim14);  // 启动TIM14中断
 HAL_DAC_Start(&hdac, DAC_CHANNEL_1); // ����DACͨ��1
 HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2048);
+HAL_DAC_Start(&hdac, DAC_CHANNEL_2 );// ����DACͨ��1
+HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 2048);
+
 
   /* USER CODE END 2 */
 
@@ -106,10 +134,12 @@ HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2048);
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		for(int i=0;i<4096;i+=128){
-			HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, i);
-			HAL_Delay(100);
-		}
+    
+		if(done==2){
+      Draw_queue_index = (Draw_queue_index + 1) % queue_LENGTH;
+      current_Line = &Draw_queue[Draw_queue_index];
+      done = 0;
+    }
 		//HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 		//HAL_Delay(1000);
     /* USER CODE END WHILE */
@@ -166,6 +196,44 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  static uint16_t current_step; // 修正拼写
+  static uint16_t step_max;     // 移到此处声明
+  if(htim->Instance == TIM14)
+  {
+    if(done==0){
+      done=1;
+      //使用勾股定理计算步数
+      // 移除了 static 初始化，改为赋值
+      {
+        int32_t dx = (int32_t)(*current_Line)[0] - (int32_t)(*current_Line)[2];
+        int32_t dy = (int32_t)(*current_Line)[1] - (int32_t)(*current_Line)[3];
+        step_max = (uint16_t)sqrt((double)dx * (double)dx + (double)dy * (double)dy);
+        current_step = 0;
+      }
+    }
+    if(done==1){
+      current_step++;//步数加1
+      if(step_max != 0) { // 防止除以0
+        int32_t dx = (int32_t)(*current_Line)[0] - (int32_t)(*current_Line)[2];
+        int32_t dy = (int32_t)(*current_Line)[1] - (int32_t)(*current_Line)[3];
+        int32_t current_X = dx * (int32_t)(step_max - current_step) / (int32_t)step_max + (int32_t)(*current_Line)[2];
+        int32_t current_Y = dy * (int32_t)(step_max - current_step) / (int32_t)step_max + (int32_t)(*current_Line)[3];
+        if(current_X < 0) current_X = 0;
+        if(current_X > 4095) current_X = 4095;
+        if(current_Y < 0) current_Y = 0;
+        if(current_Y > 4095) current_Y = 4095;
+        HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)current_X);
+        HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)current_Y);
+      }
+      if(current_step>=step_max){ // 增加安全性
+        done=2;//完成
+      }
+    }
+  }
+}
+
 
 /* USER CODE END 4 */
 
