@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    tim.h
+  * @file    sdio.h
   * @brief   This file contains all the function prototypes for
-  *          the tim.c file
+  *          the sdio.c file
   ******************************************************************************
   * @attention
   *
@@ -18,8 +18,8 @@
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __TIM_H__
-#define __TIM_H__
+#ifndef __SDIO_H__
+#define __SDIO_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,16 +32,13 @@ extern "C" {
 
 /* USER CODE END Includes */
 
-extern TIM_HandleTypeDef htim8;
-
-extern TIM_HandleTypeDef htim14;
+extern SD_HandleTypeDef hsd;
 
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
 
-void MX_TIM8_Init(void);
-void MX_TIM14_Init(void);
+void MX_SDIO_SD_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
@@ -51,5 +48,5 @@ void MX_TIM14_Init(void);
 }
 #endif
 
-#endif /* __TIM_H__ */
+#endif /* __SDIO_H__ */
 
