@@ -44,3 +44,5 @@ sdio_text\main.o: ../Core/Inc/sdio.h
 sdio_text\main.o: ../Core/Inc/usart.h
 sdio_text\main.o: ../Core/Inc/gpio.h
 sdio_text\main.o: D:\keil\ARM\ARMCC\Bin\..\include\string.h
+sdio_text\main.o: D:\keil\ARM\ARMCC\Bin\..\include\stdio.h
+sdio_text\main.o: D:\keil\ARM\ARMCC\Bin\..\include\ctype.h
