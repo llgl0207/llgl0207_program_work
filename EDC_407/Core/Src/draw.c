@@ -138,6 +138,11 @@ static int32_t offset_y = 0;
 
 // transformed endpoints cache for current line
 static int32_t tx0, ty0, tx1, ty1;
+
+// Fixed-point math variables for high-speed drawing
+static int32_t fp_x, fp_y;
+static int32_t fp_dx, fp_dy;
+
 // Memory Pool Settings
 #define MAX_DRAW_OBJS 8
 #define MAX_STR_LEN 32
@@ -340,7 +345,18 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
     step_max = (uint16_t)(sqrt((double)dx*dx + (double)dy*dy)*1);
     current_step = 0;
     
-    // Output start point immediately to ensure we don't skip it
+    // Initialize Fixed-Point variables (16.16 format)
+    fp_x = tx0 << 16;
+    fp_y = ty0 << 16;
+    if(step_max > 0) {
+        fp_dx = ((tx1 - tx0) << 16) / step_max;
+        fp_dy = ((ty1 - ty0) << 16) / step_max;
+    } else {
+        fp_dx = 0;
+        fp_dy = 0;
+    }
+
+    // Output start point immediately
     HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)tx0);
     HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)ty0);
   }
@@ -349,14 +365,20 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
     if(current_step > step_max){
         state_done = 2;
     } else {
-        if(step_max!=0){
-          int32_t curX = (tx0 * (int32_t)(step_max - current_step) + tx1 * (int32_t)current_step) / (int32_t)step_max;
-          int32_t curY = (ty0 * (int32_t)(step_max - current_step) + ty1 * (int32_t)current_step) / (int32_t)step_max;
-          if(curX<0) curX=0; if(curX>4095) curX=4095;
-          if(curY<0) curY=0; if(curY>4095) curY=4095;
-          HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)curX);
-          HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)curY);
-        }
+        // Incremental update using fixed-point math (No division!)
+        fp_x += fp_dx;
+        fp_y += fp_dy;
+        
+        uint32_t curX = fp_x >> 16;
+        uint32_t curY = fp_y >> 16;
+        
+        // Safety clipping
+        if(curX > 4095) curX = 4095;
+        if(curY > 4095) curY = 4095;
+
+        // Output current point
+        HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, curX);
+        HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, curY);
     }
   }
   else if(state_done==2){
