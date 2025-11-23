@@ -21,20 +21,22 @@ Target DLL:      CMSIS_AGDI.dll V1.30.6.0
 Dialog DLL:      TCM.DLL V1.36.1.0
  
 <h2>Project:</h2>
-e:\github\llgl0207_program_work\EDC_407\MDK-ARM\EDC_407.uvprojx
+E:\github\llgl0207_program_work\EDC_407\MDK-ARM\EDC_407.uvprojx
 Project File Date:  11/24/2025
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 6 (build 750)', folder: 'D:\Program Files\Keil_v5\ARM\ARMCC\Bin'
 Build target 'EDC_407'
-compiling draw.c...
-../Core/Src/draw.c(132): warning:  #550-D: variable "switch_interval"  was set but never used
-  static uint32_t switch_interval = 1000;
-../Core/Src/draw.c: 1 warning, 0 errors
+compiling main.c...
+../Core/Src/main.c(153): warning:  #177-D: variable "count"  was declared but never referenced
+    int count = 0;
+../Core/Src/main.c(154): warning:  #177-D: variable "buf"  was declared but never referenced
+    char buf[32];
+../Core/Src/main.c: 2 warnings, 0 errors
 linking...
 Program Size: Code=21984 RO-data=2792 RW-data=760 ZI-data=2640  
 FromELF: creating hex file...
-"EDC_407\EDC_407.axf" - 0 Error(s), 1 Warning(s).
+"EDC_407\EDC_407.axf" - 0 Error(s), 2 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -57,7 +59,7 @@ Package Vendor: Keil
 <h2>Collection of Component Files used:</h2>
 
    * Component: ARM::CMSIS:CORE:5.1.2
-Build Time Elapsed:  00:00:02
+Build Time Elapsed:  00:00:03
 </pre>
 </body>
 </html>
