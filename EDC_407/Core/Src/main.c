@@ -152,22 +152,23 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   int count = 0;
   char buf[32];
+	char buf1[32];
   
   while (1)
   {
     // 1. 格式化变量到字符串
-    //sprintf(buf, "%04d", count);
+    
     
     // 2. 清除旧的显示内容
-    DRAW_Clear();
+    
     
     // 3. 重新添加显示对象
     //DRAW_AddString("COUNT", 200, 0, 3000, 20, 20); // 静态标题
-    //DRAW_AddString(buf, 200, 0, 1000, 20, 20);     // 动态数值
+    
     
     // 4. 添加符号测试
-    DRAW_AddString("!#%*+-=/,:;.?", 100, 0, 500, 10, 10);
-    DRAW_AddString("@$<|>~", 100, 0, 0, 10, 10);
+    //DRAW_AddString("!#%*+-=/,:;.?", 100, 0, 500, 10, 10);
+    //DRAW_AddString("@$<|>~", 100, 0, 0, 10, 10);
     
     // 5. 更新变量
     //count++;
@@ -208,8 +209,21 @@ int main(void)
 		__HAL_TIM_SET_AUTORELOAD(&htim3,AAR ); // 使用宏设置//播放音乐请注释
 		count_S++;
 		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_SET);
+		DRAW_Clear();
+		if(func==0){DRAW_AddString("VOL MODE", 100, 1500, 1500, 10, 10);}
+		if(func==1){DRAW_AddString("PITCH MODE", 100, 1500, 1500, 10, 10);}
+		if(func==2){DRAW_AddString("MUSIC MODE", 100, 1500, 1500, 10, 10);}
+		sprintf(buf, "%d", scale);
+		sprintf(buf1, "%d", volume);
+		
+		
+		DRAW_AddString("MIDI CODE", 100, 0, 3000, 10, 10); // 静态标题
+		DRAW_AddString(buf, 100, 3000, 3000, 20, 20);     // 动态数值
+		DRAW_AddString("VOL", 100, 1500, 2000, 10, 10); // 静态标题
+		DRAW_AddString(buf1, 100, 3000, 2000, 20, 20);     // 动态数值
+		
 		HAL_Delay(70);
-				
+		
 		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_RESET);
 		//HAL_Delay(150);
     /* USER CODE END WHILE */

@@ -342,7 +342,10 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
     if(ty1 < 0) ty1 = 0; if(ty1 > 4095) ty1 = 4095;
     int32_t dx = tx0 - tx1;
     int32_t dy = ty0 - ty1;
-    step_max = (uint16_t)(sqrt((double)dx*dx + (double)dy*dy)*1);
+    // Increase drawing speed: fewer steps per line
+    // Divide distance by 8 to reduce total steps (faster drawing)
+    step_max = (uint16_t)(sqrt((double)dx*dx + (double)dy*dy) / 8);
+    if(step_max < 1) step_max = 1;
     current_step = 0;
     
     // Initialize Fixed-Point variables (16.16 format)
@@ -436,22 +439,46 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
         }
 
         // 4. Setup next char
-        char nc = draw_pool[current_obj_idx].text[current_char_idx];
-        if(set_pattern_by_char(nc)){
-             // Update global scale/offset for the drawing engine
-             scale_x_pct = draw_pool[current_obj_idx].sx;
-             scale_y_pct = draw_pool[current_obj_idx].sy;
-             
-             int32_t nminx, nmaxx;
-             compute_pattern_minmax_x(current_pattern, current_pattern_length, &nminx, &nmaxx);
-             int32_t left_offset = current_char_x - (nminx * (int32_t)scale_x_pct) / 100;
-             
-             offset_x = (int16_t)left_offset;
-             offset_y = (int16_t)draw_pool[current_obj_idx].y;
-        } else {
-             // Char not found? Skip or stop?
-             // For now, set_pattern_by_char returns 0.
-             // We should probably handle spaces.
+        while(1){
+            if(current_char_idx >= MAX_STR_LEN || draw_pool[current_obj_idx].text[current_char_idx] == '\0'){
+                 // End of string reached while skipping
+                 // Force a quick exit to trigger object switch on next interrupt
+                 // We can't easily switch object here recursively without refactoring.
+                 // Simplest way: set a dummy pattern (space) or just let the next interrupt handle the object switch logic again.
+                 // But the object switch logic is at the TOP of this block (line_index == 0).
+                 // So if we just return, next interrupt line_index is still 0? No, we need to ensure we come back here.
+                 // Actually, if we fail to set a pattern, we shouldn't start drawing.
+                 
+                 // Let's try to find the next object immediately here?
+                 // It's getting complicated.
+                 
+                 // Alternative: If invalid, set pattern to a "space" (empty pattern) so it "draws" nothing quickly.
+                 // But we don't have an empty pattern.
+                 
+                 // Let's just use pattern_A as a fallback but with 0 scale? No.
+                 
+                 // Best approach: Loop until we find a valid char or end of string.
+                 break; 
+            }
+
+            char nc = draw_pool[current_obj_idx].text[current_char_idx];
+            if(set_pattern_by_char(nc)){
+                 // Update global scale/offset for the drawing engine
+                 scale_x_pct = draw_pool[current_obj_idx].sx;
+                 scale_y_pct = draw_pool[current_obj_idx].sy;
+                 
+                 int32_t nminx, nmaxx;
+                 compute_pattern_minmax_x(current_pattern, current_pattern_length, &nminx, &nmaxx);
+                 int32_t left_offset = current_char_x - (nminx * (int32_t)scale_x_pct) / 100;
+                 
+                 offset_x = (int16_t)left_offset;
+                 offset_y = (int16_t)draw_pool[current_obj_idx].y;
+                 break; // Found a valid char, ready to draw
+            } else {
+                 // Char not found (e.g. space or invalid), treat as space
+                 current_char_x += (2000 * (int32_t)draw_pool[current_obj_idx].sx) / 100 + draw_pool[current_obj_idx].spacing;
+                 current_char_idx++;
+            }
         }
     }
   }
