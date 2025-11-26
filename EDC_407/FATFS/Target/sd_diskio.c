@@ -148,8 +148,6 @@ DRESULT SD_read(BYTE lun, BYTE *buff, DWORD sector, UINT count)
 {
   DRESULT res = RES_ERROR;
 
-  // 强制使用轮询模式 (Polling Mode)
-  // 原代码可能使用了 BSP_SD_ReadBlocks_DMA，这里改为 BSP_SD_ReadBlocks
   if(BSP_SD_ReadBlocks((uint32_t*)buff,
                        (uint32_t) (sector),
                        count, SD_TIMEOUT) == MSD_OK)
@@ -181,7 +179,6 @@ DRESULT SD_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
 {
   DRESULT res = RES_ERROR;
 
-  // 强制使用轮询模式 (Polling Mode)
   if(BSP_SD_WriteBlocks((uint32_t*)buff,
                         (uint32_t)(sector),
                         count, SD_TIMEOUT) == MSD_OK)

@@ -3,7 +3,15 @@
 #include <math.h>
 #include <string.h>
 
+// DMA Buffers
+uint16_t DAC_Buff_X[DRAW_BUF_SIZE];
+uint16_t DAC_Buff_Y[DRAW_BUF_SIZE];
+uint32_t DAC_Buff_Count = 0;
+
 typedef struct { uint16_t x0,y0,x1,y1; } Line_t;
+
+static uint8_t set_pattern_by_char(char c);
+static void compute_pattern_minmax_x(const Line_t *p, uint8_t len, int32_t *minx, int32_t *maxx);
 
 // For brevity, include a compact set of patterns (A..Z) copied from main.c
 // In a real library we'd store these more compactly or generate them.
@@ -123,24 +131,16 @@ static const uint8_t patterns_count = sizeof(patterns)/sizeof(patterns[0]);
 static uint8_t pattern_index = 0;
 static const Line_t *current_pattern = NULL;
 static uint8_t current_pattern_length = 0;
-static uint8_t line_index = 0;
 
-static uint16_t current_step = 0;
-static uint16_t step_max = 0;
-static uint8_t state_done = 0; // 0=init,1=drawing,2=finished line
-
-static uint32_t switch_interval = 1000;
 // Transformation: scale (percent) and offset (in DAC units)
 static uint16_t scale_x_pct = 100;
 static uint16_t scale_y_pct = 100;
 static int32_t offset_x = 0;
 static int32_t offset_y = 0;
 
-// transformed endpoints cache for current line
-static int32_t tx0, ty0, tx1, ty1;
 // Memory Pool Settings
-#define MAX_DRAW_OBJS 8
-#define MAX_STR_LEN 32
+#define MAX_DRAW_OBJS 16
+#define MAX_STR_LEN 64
 
 typedef struct {
   uint8_t active;
@@ -152,10 +152,20 @@ typedef struct {
 
 static DrawObj draw_pool[MAX_DRAW_OBJS];
 
-// Runtime State
-static int8_t current_obj_idx = -1;
-static uint8_t current_char_idx = 0;
-static int32_t current_char_x = 0;
+// Terminal State
+static uint16_t term_scale = 10;
+static int32_t term_line_height = 400;
+static int32_t term_char_spacing = 100;
+static int8_t term_current_line = 0;
+static int32_t term_cursor_x = 0;
+static int32_t term_cursor_y = 4096; // Start from top (Y is inverted? No, usually 0 is bottom or top depending on DAC. Let's assume 4096 is top for now, will adjust)
+// Actually, in previous code: ty0 = (oy0 * scale) + offset_y.
+// If offset_y is 0, it draws at bottom?
+// Let's check pattern coordinates. pattern_A: {0,0,2048,4096}. Y goes from 0 to 4096.
+// So 0 is bottom, 4096 is top.
+// Terminal should start at top (4096) and go down.
+
+static uint8_t term_max_lines = MAX_DRAW_OBJS;
 
 // helper: compute pattern min/max X
 static void compute_pattern_minmax_x(const Line_t *p, uint8_t len, int32_t *minx, int32_t *maxx){
@@ -217,31 +227,110 @@ static uint8_t set_pattern_by_char(char c){
     current_pattern = patterns[pattern_index];
     current_pattern_length = pattern_lengths[pattern_index];
     if(current_pattern_length == 0) current_pattern_length = 1;
-    line_index = 0;
-    state_done = 0; // Start at state 0 to ensure first point is drawn
     return 1;
   }
   return 0;
 }
 
+void DRAW_Render(void){
+    DAC_Buff_Count = 0;
+    
+    // If no objects, output center point
+    int active_found = 0;
+    for(int i=0; i<MAX_DRAW_OBJS; i++){
+        if(draw_pool[i].active) { active_found = 1; break; }
+    }
+    
+    if(!active_found){
+        // Fill with center point
+        for(int i=0; i<100; i++){ // minimal buffer
+             DAC_Buff_X[i] = 2048;
+             DAC_Buff_Y[i] = 2048;
+        }
+        DAC_Buff_Count = 100;
+    } else {
+        // Render objects
+        for(int i=0; i<MAX_DRAW_OBJS; i++){
+            if(!draw_pool[i].active) continue;
+            
+            // Render string
+            int32_t cursor_x = draw_pool[i].x;
+            int32_t cursor_y = draw_pool[i].y;
+            uint16_t sx = draw_pool[i].sx;
+            uint16_t sy = draw_pool[i].sy;
+            
+            for(int c=0; c<MAX_STR_LEN; c++){
+                char ch = draw_pool[i].text[c];
+                if(ch == 0) break;
+                if(ch == ' '){
+                    cursor_x += (2000 * (int32_t)sx) / 100 + draw_pool[i].spacing;
+                    continue;
+                }
+                
+                if(set_pattern_by_char(ch)){
+                    int32_t minx, maxx;
+                    compute_pattern_minmax_x(current_pattern, current_pattern_length, &minx, &maxx);
+                    
+                    // Draw each line in the pattern
+                    for(int l=0; l<current_pattern_length; l++){
+                        int32_t x0 = current_pattern[l].x0;
+                        int32_t y0 = current_pattern[l].y0;
+                        int32_t x1 = current_pattern[l].x1;
+                        int32_t y1 = current_pattern[l].y1;
+                        
+                        // Transform
+                        int32_t tx0 = (x0 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100;
+                        int32_t ty0 = (y0 * (int32_t)sy) / 100 + cursor_y;
+                        int32_t tx1 = (x1 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100;
+                        int32_t ty1 = (y1 * (int32_t)sy) / 100 + cursor_y;
+                        
+                        // Interpolate line
+                        int32_t dx = tx1 - tx0;
+                        int32_t dy = ty1 - ty0;
+                        // Reduce divisor to increase point count (slower drawing, brighter lines, less visible jumps)
+                        // Aggressively reduce points to fit more text. 
+                        // Distance / 80 means a 2000 unit line has 25 points.
+                        int steps = (int)sqrt((double)dx*dx + (double)dy*dy) / 10; 
+                        if(steps < 2) steps = 2; // At least start and end points
+                        
+                        for(int s=0; s<=steps; s++){
+                            if(DAC_Buff_Count >= DRAW_BUF_SIZE) break;
+                            DAC_Buff_X[DAC_Buff_Count] = tx0 + (dx * s) / steps;
+                            DAC_Buff_Y[DAC_Buff_Count] = ty0 + (dy * s) / steps;
+                            
+                            // Clip
+                            if(DAC_Buff_X[DAC_Buff_Count] > 4095) DAC_Buff_X[DAC_Buff_Count] = 4095;
+                            if(DAC_Buff_Y[DAC_Buff_Count] > 4095) DAC_Buff_Y[DAC_Buff_Count] = 4095;
+                            
+                            DAC_Buff_Count++;
+                        }
+                    }
+                    
+                    // Advance cursor
+                    cursor_x += ((maxx - minx) * (int32_t)sx) / 100 + draw_pool[i].spacing;
+                }
+            }
+        }
+    }
+    
+    // Update DMA
+    if(DAC_Buff_Count > 0){
+        HAL_DAC_Stop_DMA(&hdac, DAC_CHANNEL_1);
+        HAL_DAC_Stop_DMA(&hdac, DAC_CHANNEL_2);
+        HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_1, (uint32_t*)DAC_Buff_X, DAC_Buff_Count, DAC_ALIGN_12B_R);
+        HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_2, (uint32_t*)DAC_Buff_Y, DAC_Buff_Count, DAC_ALIGN_12B_R);
+    }
+}
+
 void DRAW_Clear(void){
   for(int i=0; i<MAX_DRAW_OBJS; i++) draw_pool[i].active = 0;
-  current_obj_idx = -1;
-  state_done = 0;
-  HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2048);
-  HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 2048);
+  DRAW_Render();
 }
 
 void DRAW_Init(uint32_t interval_ms){
   if(patterns_count == 0) return;
-  switch_interval = interval_ms;
   DRAW_Clear();
-  // start DAC centers
-  HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
-  HAL_DAC_Start(&hdac, DAC_CHANNEL_2);
 }
-
-void DRAW_SetInterval(uint32_t ms){ switch_interval = ms; }
 
 void DRAW_SetScale(uint16_t scale_x_percent, uint16_t scale_y_percent){
   if(scale_x_percent == 0) scale_x_percent = 1;
@@ -271,38 +360,10 @@ uint8_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y, ui
   draw_pool[slot].spacing = spacing;
   draw_pool[slot].active = 1;
   
-  if(current_obj_idx == -1){
-      current_obj_idx = slot;
-      current_char_idx = 0;
-      current_char_x = x;
-      
-      // Handle leading spaces
-      while(draw_pool[slot].text[current_char_idx] == ' '){
-           current_char_x += (2000 * (int32_t)sx) / 100 + spacing;
-           current_char_idx++;
-      }
-
-      if(draw_pool[slot].text[current_char_idx]){
-          if(set_pattern_by_char(draw_pool[slot].text[current_char_idx])){
-             int32_t minx, maxx;
-             compute_pattern_minmax_x(current_pattern, current_pattern_length, &minx, &maxx);
-             int32_t left_offset = current_char_x - (minx * (int32_t)sx) / 100;
-             DRAW_SetOffset((int16_t)left_offset, (int16_t)y);
-             DRAW_SetScale(sx, sy);
-          }
-      }
-  }
+  // Update buffer immediately
+  DRAW_Render();
+  
   return 1;
-}
-
-void DRAW_DrawString(const char *s, uint16_t spacing, int32_t base_x, int32_t base_y,
-                     uint16_t scale_x_percent, uint16_t scale_y_percent){
-    DRAW_Clear();
-    DRAW_AddString(s, spacing, base_x, base_y, scale_x_percent, scale_y_percent);
-}
-
-uint8_t DRAW_IsBusy(void){
-  return (uint8_t)(current_obj_idx != -1);
 }
 
 void DRAW_SetLetter(char c){
@@ -311,126 +372,119 @@ void DRAW_SetLetter(char c){
     DRAW_AddString(buf, 0, offset_x, offset_y, scale_x_pct, scale_y_pct);
 }
 
-void DRAW_AutoTick(uint32_t now){
-  // Not supported in pool mode
+void DRAW_Terminal_Init(uint16_t scale_pct){
+    if(scale_pct < 1) scale_pct = 1;
+    DRAW_Clear();
+    term_scale = scale_pct;
+    
+    term_char_spacing = (500 * (int32_t)scale_pct) / 100; // spacing
+    
+    // Estimate line height: 4096 (full height) * scale / 100.
+    // A char is roughly 4096 units high in pattern space.
+    int32_t char_h = (4096 * (int32_t)scale_pct) / 100;
+    
+    // Add some padding (use char spacing as vertical padding)
+    term_line_height = char_h + term_char_spacing; 
+    
+    // Calculate max visible lines
+    // Formula: (4096 + padding) / (height + padding)
+    term_max_lines = (4096 + term_char_spacing) / term_line_height;
+    
+    if(term_max_lines > MAX_DRAW_OBJS) term_max_lines = MAX_DRAW_OBJS;
+    if(term_max_lines < 1) term_max_lines = 1;
+    
+    term_current_line = 0;
+    // Start Y at top - line_height (so the first line is visible)
+    // Wait, if Y=0 is bottom, then top line is at Y=4096 - height.
+    term_cursor_y = 4096 - term_line_height;
+    term_cursor_x = 0;
 }
 
-void DRAW_TimerStep(TIM_HandleTypeDef *htim){
-  if(htim->Instance != TIM14) return;
-  if(current_obj_idx == -1) return;
-
-  if(state_done==0){
-    state_done = 1;
-    // compute step_max
-    // compute transformed endpoints with scale and offset
-    int32_t ox0 = (int32_t)current_pattern[line_index].x0;
-    int32_t oy0 = (int32_t)current_pattern[line_index].y0;
-    int32_t ox1 = (int32_t)current_pattern[line_index].x1;
-    int32_t oy1 = (int32_t)current_pattern[line_index].y1;
-    tx0 = (ox0 * (int32_t)scale_x_pct) / 100 + offset_x;
-    ty0 = (oy0 * (int32_t)scale_y_pct) / 100 + offset_y;
-    tx1 = (ox1 * (int32_t)scale_x_pct) / 100 + offset_x;
-    ty1 = (oy1 * (int32_t)scale_y_pct) / 100 + offset_y;
-    if(tx0 < 0) tx0 = 0; if(tx0 > 4095) tx0 = 4095;
-    if(tx1 < 0) tx1 = 0; if(tx1 > 4095) tx1 = 4095;
-    if(ty0 < 0) ty0 = 0; if(ty0 > 4095) ty0 = 4095;
-    if(ty1 < 0) ty1 = 0; if(ty1 > 4095) ty1 = 4095;
-    int32_t dx = tx0 - tx1;
-    int32_t dy = ty0 - ty1;
-    step_max = (uint16_t)(sqrt((double)dx*dx + (double)dy*dy)*1);
-    current_step = 0;
-    
-    // Output start point immediately to ensure we don't skip it
-    HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)tx0);
-    HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)ty0);
-  }
-  else if(state_done==1){
-    current_step++;
-    if(current_step > step_max){
-        state_done = 2;
-    } else {
-        if(step_max!=0){
-          int32_t curX = (tx0 * (int32_t)(step_max - current_step) + tx1 * (int32_t)current_step) / (int32_t)step_max;
-          int32_t curY = (ty0 * (int32_t)(step_max - current_step) + ty1 * (int32_t)current_step) / (int32_t)step_max;
-          if(curX<0) curX=0; if(curX>4095) curX=4095;
-          if(curY<0) curY=0; if(curY>4095) curY=4095;
-          HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)curX);
-          HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)curY);
-        }
+void DRAW_Terminal_Print(const char *str){
+    // If no active line, start one
+    if(term_current_line == 0 && !draw_pool[0].active){
+        draw_pool[0].active = 1;
+        draw_pool[0].x = 0;
+        draw_pool[0].y = term_cursor_y;
+        draw_pool[0].sx = term_scale;
+        draw_pool[0].sy = term_scale;
+        draw_pool[0].spacing = term_char_spacing;
+        draw_pool[0].text[0] = '\0';
     }
-  }
-  else if(state_done==2){
-    // advance to next line
-    line_index = (line_index + 1) % current_pattern_length;
-    state_done = 0;
-    // If we've just wrapped to line 0, it means the glyph finished one full pass.
-    if(line_index == 0){
-        // Char finished.
-        // 1. Advance X position for next char
-        int32_t minx, maxx;
-        compute_pattern_minmax_x(current_pattern, current_pattern_length, &minx, &maxx);
-        int32_t gw = maxx - minx;
-        int32_t scaled_gw = (gw * (int32_t)draw_pool[current_obj_idx].sx) / 100;
-        current_char_x += scaled_gw + draw_pool[current_obj_idx].spacing;
 
-        // 2. Advance index
-        current_char_idx++;
+    int len = strlen(str);
+    for(int i=0; i<len; i++){
+        char c = str[i];
         
-        // Handle spaces
-        while(current_char_idx < MAX_STR_LEN && draw_pool[current_obj_idx].text[current_char_idx] == ' '){
-             current_char_x += (2000 * (int32_t)draw_pool[current_obj_idx].sx) / 100 + draw_pool[current_obj_idx].spacing;
-             current_char_idx++;
-        }
-        
-        // 3. Check end of string
-        if(current_char_idx >= MAX_STR_LEN || draw_pool[current_obj_idx].text[current_char_idx] == '\0'){
-            // Object finished. Find next active object.
-            int start_search = current_obj_idx + 1;
-            int found = -1;
-            // Search forward
-            for(int i=0; i<MAX_DRAW_OBJS; i++){
-                int idx = (start_search + i) % MAX_DRAW_OBJS;
-                if(draw_pool[idx].active){
-                    found = idx;
-                    break;
+        // Handle Newline
+        if(c == '\n'){
+            // Move to next line
+            term_current_line++;
+            if(term_current_line >= term_max_lines){
+                // Scroll up
+                for(int j=0; j<term_max_lines-1; j++){
+                    strcpy(draw_pool[j].text, draw_pool[j+1].text);
+                    // Ensure active status is propagated (though usually all are active when scrolling)
+                    draw_pool[j].active = draw_pool[j+1].active;
+                    // Coordinates are fixed per slot, so we don't copy them.
+                    // Slot 0 is always top line, Slot 1 is second line...
+                    // But wait, we need to ensure slot 0 is active if slot 1 was active.
                 }
+                // Clear last line
+                draw_pool[term_max_lines-1].text[0] = '\0';
+                term_current_line = term_max_lines - 1;
             }
             
-            if(found != -1){
-                current_obj_idx = found;
-                current_char_idx = 0;
-                current_char_x = draw_pool[found].x;
-                
-                // Handle leading spaces for next object
-                while(draw_pool[found].text[current_char_idx] == ' '){
-                     current_char_x += (2000 * (int32_t)draw_pool[found].sx) / 100 + draw_pool[found].spacing;
-                     current_char_idx++;
-                }
-            } else {
-                // No active objects? Should not happen if we are here.
-                current_obj_idx = -1;
-                return;
-            }
+            // Setup new line
+            draw_pool[term_current_line].active = 1;
+            draw_pool[term_current_line].x = 0;
+            // Calculate Y for this slot
+            draw_pool[term_current_line].y = 4096 - (term_current_line + 1) * term_line_height;
+            draw_pool[term_current_line].sx = term_scale;
+            draw_pool[term_current_line].sy = term_scale;
+            draw_pool[term_current_line].spacing = term_char_spacing;
+            draw_pool[term_current_line].text[0] = '\0';
+            
+            term_cursor_x = 0;
+            continue;
         }
-
-        // 4. Setup next char
-        char nc = draw_pool[current_obj_idx].text[current_char_idx];
-        if(set_pattern_by_char(nc)){
-             // Update global scale/offset for the drawing engine
-             scale_x_pct = draw_pool[current_obj_idx].sx;
-             scale_y_pct = draw_pool[current_obj_idx].sy;
-             
-             int32_t nminx, nmaxx;
-             compute_pattern_minmax_x(current_pattern, current_pattern_length, &nminx, &nmaxx);
-             int32_t left_offset = current_char_x - (nminx * (int32_t)scale_x_pct) / 100;
-             
-             offset_x = (int16_t)left_offset;
-             offset_y = (int16_t)draw_pool[current_obj_idx].y;
-        } else {
-             // Char not found? Skip or stop?
-             // For now, set_pattern_by_char returns 0.
-             // We should probably handle spaces.
+        
+        // Check width (rough estimation)
+        // Char width approx 2000 units unscaled
+        int32_t char_w = (2000 * (int32_t)term_scale) / 100 + term_char_spacing;
+        if(term_cursor_x + char_w > 4096){
+             // Auto wrap
+             // Recursive call with newline? Or just duplicate logic
+             // Let's just trigger newline logic
+             term_current_line++;
+             if(term_current_line >= term_max_lines){
+                for(int j=0; j<term_max_lines-1; j++){
+                    strcpy(draw_pool[j].text, draw_pool[j+1].text);
+                    draw_pool[j].active = draw_pool[j+1].active;
+                }
+                draw_pool[term_max_lines-1].text[0] = '\0';
+                term_current_line = term_max_lines - 1;
+             }
+             draw_pool[term_current_line].active = 1;
+             draw_pool[term_current_line].x = 0;
+             draw_pool[term_current_line].y = 4096 - (term_current_line + 1) * term_line_height;
+             draw_pool[term_current_line].sx = term_scale;
+             draw_pool[term_current_line].sy = term_scale;
+             draw_pool[term_current_line].spacing = term_char_spacing;
+             draw_pool[term_current_line].text[0] = '\0';
+             term_cursor_x = 0;
+        }
+        
+        // Append char
+        int cur_len = strlen(draw_pool[term_current_line].text);
+        if(cur_len < MAX_STR_LEN - 1){
+            draw_pool[term_current_line].text[cur_len] = c;
+            draw_pool[term_current_line].text[cur_len+1] = '\0';
+            term_cursor_x += char_w;
         }
     }
-  }
+    
+    DRAW_Render();
 }
+
+// End of file

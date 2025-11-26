@@ -151,12 +151,17 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM8_Init();
   MX_TIM3_Init();
-  // MX_SDIO_SD_Init(); // <--- 注释掉自动生成的初始化，改为手动调用
+  MX_SDIO_SD_Init();
   MX_FATFS_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
   /* 初始化绘图库 */
   DRAW_Init(1000); 
-  HAL_TIM_Base_Start_IT(&htim14);  // 立即启动绘图，确保屏幕有显示
+  HAL_TIM_Base_Start(&htim6);  // Start TIM6 for DAC DMA trigger
+  
+  // Initialize Terminal Mode (Scale 12%)
+  DRAW_Terminal_Init(12);
+  DRAW_Terminal_Print("SYSTEM BOOT...\n");
 	
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
 	HAL_TIM_Base_Start_IT(&htim3);
@@ -164,42 +169,50 @@ int main(void)
 
   // --- SD卡调试代码 ---
   // 坐标调整：X=1000 (偏左中), Y=2000 (垂直居中), 缩放=10% (较小)
-  DRAW_Clear();
-  DRAW_AddString("STEP 1: INIT", 100, 1000, 2000, 10, 10);
+  // DRAW_Clear();
+  DRAW_Terminal_Print("STEP 1: INIT\n");
   HAL_Delay(1000); 
 
   // 手动初始化 SDIO
   MX_SDIO_SD_Init();
   
-  DRAW_Clear();
-  DRAW_AddString("STEP 2: CHECK", 100, 1000, 2000, 10, 10);
+  // DRAW_Clear();
+  DRAW_Terminal_Print("STEP 2: CHECK\n");
   HAL_Delay(1000);
 
+  // Test Scrolling
+  for(int i=0; i<5; i++){
+      char buf[20];
+      sprintf(buf, "Line %d\n", i+3);
+      DRAW_Terminal_Print(buf);
+      HAL_Delay(200);
+  }
+	
   if(hsd.State == HAL_SD_STATE_READY)
   {
       HAL_SD_CardInfoTypeDef CardInfo;
       if(HAL_SD_GetCardInfo(&hsd, &CardInfo) == HAL_OK)
       {
           char info_buf[32];
-          sprintf(info_buf, "TYPE:%d", CardInfo.CardType);
-          DRAW_Clear();
-          DRAW_AddString(info_buf, 100, 1000, 2000, 10, 10);
+          sprintf(info_buf, "TYPE:%d\n", CardInfo.CardType);
+          // DRAW_Clear();
+          DRAW_Terminal_Print(info_buf);
           HAL_Delay(500);
           
           // 尝试读取
           // uint8_t test_buff[512]; // Moved to global
           if(HAL_SD_ReadBlocks(&hsd, test_buff, 0, 1, 1000) == HAL_OK)
           {
-              DRAW_Clear();
-              DRAW_AddString("READ OK", 100, 1000, 2000, 10, 10);
+              // DRAW_Clear();
+              DRAW_Terminal_Print("READ OK\n");
               
               // --- 尝试 FatFS 挂载 ---
               HAL_Delay(1000);
               res = f_mount(&fs, "0:", 1);
               if(res == FR_OK)
               {
-                  DRAW_Clear();
-                  DRAW_AddString("MOUNT OK", 100, 1000, 2000, 10, 10);
+                  // DRAW_Clear();
+                  DRAW_Terminal_Print("MOUNT OK\n");
                   
                   // 写入测试
                   res = f_open(&fil, "test.txt", FA_CREATE_ALWAYS | FA_WRITE);
@@ -208,8 +221,8 @@ int main(void)
                       sprintf(sd_buf, "FatFS Works!"); // 写入简单字符串
                       f_write(&fil, sd_buf, strlen(sd_buf), &bw);
                       f_close(&fil);
-                      DRAW_Clear();
-                      DRAW_AddString("WRITE OK", 100, 1000, 2000, 10, 10);
+                      // DRAW_Clear();
+                      DRAW_Terminal_Print("WRITE OK\n");
                       
                       HAL_Delay(1000);
                       
@@ -222,51 +235,52 @@ int main(void)
                           f_read(&fil, read_buf, sizeof(read_buf)-1, &br);
                           f_close(&fil);
                           
-                          DRAW_Clear();
+                          // DRAW_Clear();
                           // 显示读取到的内容，证明写入成功
-                          DRAW_AddString(read_buf, 100, 1000, 2000, 10, 10);
+                          DRAW_Terminal_Print(read_buf);
+                          DRAW_Terminal_Print("\n");
                       }
                       else
                       {
-                          DRAW_Clear();
-                          DRAW_AddString("READ FAIL", 100, 1000, 2000, 10, 10);
+                          // DRAW_Clear();
+                          DRAW_Terminal_Print("READ FAIL\n");
                       }
                   }
                   else
                   {
-                      DRAW_Clear();
-                      DRAW_AddString("OPEN ERR", 100, 1000, 2000, 10, 10);
+                      // DRAW_Clear();
+                      DRAW_Terminal_Print("OPEN ERR\n");
                   }
               }
               else
               {
                   char mnt_err[32];
-                  sprintf(mnt_err, "MNT ERR:%d", res);
-                  DRAW_Clear();
-                  DRAW_AddString(mnt_err, 100, 1000, 2000, 10, 10);
+                  sprintf(mnt_err, "MNT ERR:%d\n", res);
+                  // DRAW_Clear();
+                  DRAW_Terminal_Print(mnt_err);
               }
               // -----------------------
           }
           else
           {
               char err_buf[32];
-              sprintf(err_buf, "ERR:%d", hsd.ErrorCode);
-              DRAW_Clear();
-              DRAW_AddString(err_buf, 100, 1000, 2000, 10, 10);
+              sprintf(err_buf, "ERR:%d\n", hsd.ErrorCode);
+              // DRAW_Clear();
+              DRAW_Terminal_Print(err_buf);
           }
       }
       else
       {
-          DRAW_Clear();
-          DRAW_AddString("INFO ERR", 100, 1000, 2000, 10, 10);
+          // DRAW_Clear();
+          DRAW_Terminal_Print("INFO ERR\n");
       }
   }
   else
   {
       char state_buf[32];
-      sprintf(state_buf, "FAIL:%d", hsd.State);
-      DRAW_Clear();
-      DRAW_AddString(state_buf, 100, 1000, 2000, 10, 10);
+      sprintf(state_buf, "FAIL:%d\n", hsd.State);
+      // DRAW_Clear();
+      DRAW_Terminal_Print(state_buf);
   }
   // -------------------
   /* USER CODE END 2 */
@@ -276,7 +290,10 @@ int main(void)
   int count = 0;
   char buf[32];
 	char buf1[32];
-  
+   //DRAW_Clear();
+   DRAW_Terminal_Print("ABCDEFGHIJKLMNOPQRSTUVWXYZ\n");
+   
+   //DRAW_AddString("ABCDEFGQ", 100, 0, 0, 10, 10);
   while (1)
   {
     // 1. 格式化变量到字符串
@@ -463,11 +480,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  /* 将 TIM14 的绘制步进委托给绘图库 */
-  if(htim->Instance == TIM14)
-  {
-    DRAW_TimerStep(htim);
-  }
 	if(htim->Instance == TIM3)
   {
 		/*
