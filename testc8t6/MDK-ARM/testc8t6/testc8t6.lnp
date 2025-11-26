@@ -1,0 +1,22 @@
+--cpu Cortex-M3
+"testc8t6\startup_stm32f103xb.o"
+"testc8t6\main.o"
+"testc8t6\gpio.o"
+"testc8t6\stm32f1xx_it.o"
+"testc8t6\stm32f1xx_hal_msp.o"
+"testc8t6\stm32f1xx_hal_gpio_ex.o"
+"testc8t6\stm32f1xx_hal.o"
+"testc8t6\stm32f1xx_hal_rcc.o"
+"testc8t6\stm32f1xx_hal_rcc_ex.o"
+"testc8t6\stm32f1xx_hal_gpio.o"
+"testc8t6\stm32f1xx_hal_dma.o"
+"testc8t6\stm32f1xx_hal_cortex.o"
+"testc8t6\stm32f1xx_hal_pwr.o"
+"testc8t6\stm32f1xx_hal_flash.o"
+"testc8t6\stm32f1xx_hal_flash_ex.o"
+"testc8t6\stm32f1xx_hal_exti.o"
+"testc8t6\system_stm32f1xx.o"
+--strict --scatter "testc8t6\testc8t6.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "testc8t6.map" -o testc8t6\testc8t6.axf

@@ -358,9 +358,8 @@ int main(void)
   char buf[32];
 	char buf1[32];
    //DRAW_Clear();
-   DRAW_Terminal_Print("ABCDEFGHIJKLMNOPQRSTUVWXYZ\n");
-   
-   //DRAW_AddString("ABCDEFGQ", 100, 0, 0, 10, 10);
+   DRAW_Terminal_Print("abcdefghijklmnopqrstuvwxyz");
+   //DRAW_AddString("c", 100, 0, 0, 100, 100);
   while (1)
   {
     // 1. 格式化变量到字符串
@@ -385,6 +384,23 @@ int main(void)
     //HAL_Delay(200);
     
 		HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
+
+        // --- Alphabet Test ---
+        static uint32_t last_print = 0;
+        static int alpha_idx = 0;
+        const char alpha_map[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+        if(HAL_GetTick() - last_print > 500)
+        {
+             last_print = HAL_GetTick();
+             char s[2] = {0};
+             s[0] = alpha_map[alpha_idx];
+             DRAW_Terminal_Print(s);
+             
+             alpha_idx++;
+             if(alpha_map[alpha_idx] == '\0') alpha_idx = 0;
+        }
+        // ---------------------
 	
 		static uint16_t encoder=0;
 		static uint16_t last_encoder=0;
