@@ -15,32 +15,58 @@ static void compute_pattern_minmax_x(const Line_t *p, uint8_t len, int32_t *minx
 
 // For brevity, include a compact set of patterns (A..Z) copied from main.c
 // In a real library we'd store these more compactly or generate them.
-static const Line_t pattern_A[] = { {0,0,2048,4096}, {2048,4096,4096,0}, {1024,2048,3072,2048} };
-static const Line_t pattern_B[] = { {0,0,0,4096}, {0,4096,1365,4096}, {1365,4096,2048,3413}, {2048,3413,2048,2730}, {2048,2730,1365,2048}, {1365,2048,0,2048}, {0,2048,1365,2048}, {1365,2048,2048,1365},{2048,1365,2048,682},{2048,682,1365,0},{1365,0,0,0} };
-static const Line_t pattern_C[] = { {3000,1000,2000,800}, {2000,800,1200,1400}, {1200,1400,1000,2600}, {1000,2600,1200,3200}, {1200,3200,2000,3800}, {2000,3800,3000,3600} };
-static const Line_t pattern_D[] = { {1200,800,1200,3800}, {1200,3800,2200,3800}, {2200,3800,2600,2800}, {2600,2800,2600,1800}, {2600,1800,2200,800},{2200,800,1200,800} };
-static const Line_t pattern_E[] = { {1200,800,1200,3800}, {1200,800,3000,800}, {1200,2300,2600,2300}, {1200,3800,3000,3800} };
-static const Line_t pattern_F[] = { {1200,3295,1200,295}, {1200,3295,3000,3295}, {1200,1795,2600,1795} };
-static const Line_t pattern_G[] = { {3000,1200,2000,800}, {2000,800,1200,1400}, {1200,1400,1000,2600}, {1000,2600,1200,3200}, {1200,3200,2200,3800}, {2200,3800,3000,3600}, {2500,2500,3000,2500} };
-static const Line_t pattern_H[] = { {1200,800,1200,3800}, {3000,800,3000,3800}, {1200,2300,3000,2300} };
-static const Line_t pattern_I[] = { {2000,800,2500,800}, {2250,800,2250,3800}, {2000,3800,2500,3800} };
-static const Line_t pattern_J[] = { {1700,3295,2300,3295}, {2000,3295,2000,1095}, {2000,1095,1800,1000},{1800,1000,1700,1000} };
-static const Line_t pattern_K[] = { {1200,800,1200,3800}, {2500,800,1200,2300}, {1200,2300,2500,3800} };
-static const Line_t pattern_L[] = { {1200,3295,1200,295}, {1200,295,2400,295} };
-static const Line_t pattern_M[] = { {1200,3295,1200,295}, {1200,3295,2200,2095}, {2200,2095,3000,3295}, {3000,3295,3000,295} };
-static const Line_t pattern_N[] = { {1200,3295,1200,295}, {1200,3295,3000,295}, {3000,3295,3000,295} };
-static const Line_t pattern_O[] = { {2000,3295,3000,2895}, {3000,2895,3200,1495}, {3200,1495,2600,495}, {2600,495,1600,895}, {1600,895,1400,2095}, {1400,2095,2000,3295} };
-static const Line_t pattern_P[] = { {1200,3295,1200,295}, {1200,3295,2300,3295}, {2300,3295,2500,2795},{2500,2795,2500,2395},{2500,2395,2300,1795},{2300,1795,1200,1795} };
-static const Line_t pattern_Q[] = { {2000,3295,3000,2895}, {3000,2895,3200,1495}, {3200,1495,2600,495}, {2600,495,1600,895}, {1600,895,1400,2095}, {1400,2095,2000,3295}, {2500,1095,3200,295} };
-static const Line_t pattern_R[] = { {1200,3295,1200,295}, {1200,3295,2300,3295}, {2300,3295,2500,2795},{2500,2795,2500,2395},{2500,2395,2300,1795},{2300,1795,1200,1795}, {1200,1795,3000,295} };
-static const Line_t pattern_S[] = { {1365,0,2048,0}, {2048,0,3072,1024}, {3072,1024,1024,3072},{1024,3072,2048,4096},{2048,4096,2730,4096} };
-static const Line_t pattern_T[] = { {2000,3295,2800,3295}, {2400,3295,2400,295} };
-static const Line_t pattern_U[] = { {1200,3295,1200,895}, {1200,895,2200,295}, {2200,295,3200,895}, {3200,895,3200,3295} };
-static const Line_t pattern_V[] = { {1200,3295,2200,295}, {2200,295,3200,3295} };
-static const Line_t pattern_W[] = { {1200,3295,1600,295}, {1600,295,2200,2095}, {2200,2095,2800,295}, {2800,295,3200,3295} };
-static const Line_t pattern_X[] = { {1200,3295,3200,295}, {3200,3295,1200,295} };
-static const Line_t pattern_Y[] = { {1200,3295,2200,1895}, {3200,3295,2200,1895}, {2200,1895,2200,295} };
-static const Line_t pattern_Z[] = { {1200,3295,3200,3295}, {3200,3295,1200,295}, {1200,295,3200,295} };
+static const Line_t pattern_A[] = { {1024, 512, 2048, 3584},{2048, 3584, 3072, 512},{1536, 2048, 2560, 2048}};
+static const Line_t pattern_a[] = { {1536, 2560, 2560, 2560},{2560, 2560, 3072, 2048} ,{ 3072, 2048, 3072, 512},{ 3072, 512, 1536, 512},{1536, 512, 1024, 1024},{1024, 1024, 1536, 1536},{1536, 1536, 3072, 1536}};
+static const Line_t pattern_B[] = { {1024, 512, 1024, 3584},{1024, 3584, 2560, 3584},{2560, 3584, 3072, 3072},{3072, 3072, 3072, 2560},{3072, 2560, 2560, 2048},{2560, 2048, 1024, 2048},{2560, 2048, 3072, 1536},{3072, 1536, 3072, 1024},{3072, 1024, 2560, 512},{2560, 512, 1024, 512}};
+static const Line_t pattern_b[] = { {1024, 3584, 1024, 512},{1024, 512, 2048, 512},{2048, 512, 2560, 1024},{2560, 1024, 2560, 1536},{2560, 1536, 2048, 2048},{2048, 2048, 1024, 2048}};
+static const Line_t pattern_C[] = { {3072, 3072, 2560, 3584},{2560, 3584, 1536, 3584},{1536, 3584, 1024, 3072},{1024, 3072, 1024, 1024},{1024, 1024, 1536, 512},{1536, 512, 2560, 512},{2560, 512, 3072, 1024}};
+static const Line_t pattern_c[] = { {2560, 1536, 2048, 2048},{2048, 2048, 1536, 2048},{1536, 2048, 1024, 1536},{1024, 1536, 1024, 1024},{1024, 1024, 512, 1536},{512, 1536, 512, 2048},{512, 2048, 1024, 2560}};
+static const Line_t pattern_D[] = { {1024, 512, 1024, 3584},{1024, 3584, 2560, 3584},{2560, 3584, 3072, 2560},{3072, 2560, 3072, 1536},{3072, 1536, 2560, 512},{2560, 512, 1024, 512}};
+static const Line_t pattern_d[] = { {2560, 3584, 2560, 512},{2560, 512, 1536, 512},{1536, 512, 1024, 1024},{1024, 1024, 1024, 1536},{1024, 1536, 1536, 2048},{1536, 2048, 2560, 2048}};
+static const Line_t pattern_E[] = { {3072, 3584, 1024, 3584},{1024, 3584, 1024, 512},{1024, 512, 512, 3072},{1024, 2048, 2560, 2048}};
+static const Line_t pattern_e[] = { {3072, 512, 1536, 512},{1536, 512, 1024, 1024},{1024, 1024, 1024, 2048},{1024, 2048, 1536, 2560},{1536, 2560, 2048, 2560},{2048, 2560, 2560, 2048},{2560, 2048, 2048, 1536},{2048, 1536, 1024, 1536}};
+static const Line_t pattern_F[] = { {1024, 512, 1024, 3584},{1024, 3584, 3072, 3584},{1024, 2048, 2560, 2048}};
+static const Line_t pattern_f[] = { {2560, 3072, 2304, 3072},{2304, 3072, 2048, 2816},{2048, 2816, 2048, 512},{1536, 2048, 2560, 2048}};
+static const Line_t pattern_G[] = { {3072, 3072, 2560, 3584},{2560, 3584, 1536, 3584},{1536, 3584, 1024, 3072},{1024, 3072, 1024, 1024},{1024, 1024, 1536, 512},{1536, 512, 2560, 512},{2560, 512, 3072, 1024},{3072, 1024, 3072, 2048},{3072, 2048, 2048, 2048}};
+static const Line_t pattern_g[] = { {1024, 512, 2048, 512},{2048, 512, 2560, 1024},{2560, 1024, 2560, 2560},{2560, 2560, 2048, 3072},{2048, 3072, 1536, 3072},{1536, 3072, 1024, 2560},{1024, 2560, 1024, 2048},{1024, 2048, 1536, 1536},{1536, 1536, 2048, 1536},{2048, 1536, 2560, 2048}};
+static const Line_t pattern_H[] = { {1024, 512, 1024, 3584},{3072, 512, 3072, 3584},{1024, 2048, 3072, 2048}};
+static const Line_t pattern_h[] = { {1536, 512, 1536, 3584},{1536, 1536, 2048, 2048},{2048, 2048, 2048, 2560},{2048, 2560, 3072, 1536},{3072, 1536, 3072, 512}};
+static const Line_t pattern_I[] = { {1536, 512, 2560, 512},{2048, 512, 2048, 3584},{1536, 3584, 2560, 3584}};
+static const Line_t pattern_i[] = { {2048, 1536, 2048, 2048},{2048, 2560, 2048, 3072},{2048, 2048, 2048, 512},{1536, 512, 2560, 512}};
+static const Line_t pattern_J[] = { {1792, 3584, 3328, 3584},{3072, 3072, 3072, 1024},{3072, 1024, 2560, 512},{2560, 512, 2048, 512}};
+static const Line_t pattern_j[] = { {2560, 3584, 2560, 3072},{2560, 2560, 2560, 1024},{2560, 1024, 2048, 512}};
+static const Line_t pattern_K[] = { {1024, 3584, 1024, 512},{1024, 2048, 2560, 512},{1024, 2048, 2560, 3584}};
+static const Line_t pattern_k[] = { {1536, 512, 1536, 3072},{1536, 1536, 2048, 2560},{1536, 1536, 512, 2560}};
+static const Line_t pattern_L[] = { {1024, 3584, 1024, 512},{1024, 512, 3072, 512}};
+static const Line_t pattern_l[] = { {2048, 3584, 2048, 512},{2048, 512, 2304, 768}};
+static const Line_t pattern_M[] = { {1024, 512, 1024, 3584},{1024, 3584, 2048, 2048},{2048, 2048, 3072, 3584},{3072, 3584, 3072, 512}};
+static const Line_t pattern_m[] = { {1024, 512, 1024, 2048},{1024, 2048, 1536, 2560},{1536, 2560, 2048, 2048},{2048, 2048, 2048, 512},{2048, 512, 2560, 1024},{2560, 1024, 3072, 512},{3072, 512, 3072, 2048}};
+static const Line_t pattern_N[] = { {1024, 512, 1024, 3584},{1024, 3584, 3072, 512},{3072, 512, 3072, 3584}};
+static const Line_t pattern_n[] = { {1024, 512, 1024, 2048},{1024, 2048, 1536, 2560},{1536, 2560, 2048, 2560},{2048, 2560, 2560, 2048},{2560, 2048, 2560, 512}};
+static const Line_t pattern_O[] = { {1536, 512, 2560, 512},{2560, 512, 3072, 1024},{3072, 1024, 3072, 3072},{3072, 3072, 2560, 3584},{2560, 3584, 1536, 3584},{1536, 3584, 1024, 3072},{1024, 3072, 1024, 1024},{1024, 1024, 1536, 512}};
+static const Line_t pattern_o[] = { {1536, 512, 2048, 512},{2048, 512, 2560, 1024},{2560, 1024, 2560, 2048},{2560, 2048, 2048, 2560},{2048, 2560, 1536, 2560},{1536, 2560, 1024, 2048},{1024, 2048, 1024, 1024},{1024, 1024, 1536, 512}};
+static const Line_t pattern_P[] = { {1024, 512, 1024, 3584},{1024, 3584, 2560, 3584},{2560, 3584, 3072, 3072},{3072, 3072, 3072, 2560},{3072, 2560, 2560, 2048},{2560, 2048, 1024, 2048}};
+static const Line_t pattern_p[] = { {1024, 512, 1024, 2560},{1024, 2560, 2048, 2560},{2048, 2560, 2560, 2048},{2560, 2048, 2048, 1536},{2048, 1536, 1024, 1536}};
+static const Line_t pattern_Q[] = { {1536, 512, 2560, 512},{2560, 512, 3072, 1024},{3072, 1024, 3072, 3072},{3072, 3072, 2560, 3584},{2560, 3584, 1536, 3584},{1536, 3584, 1024, 3072},{1024, 3072, 1024, 1024},{1024, 1024, 1536, 512},{2560, 1536, 3584, 512}};
+static const Line_t pattern_q[] = { {2560, 512, 2560, 2560},{2560, 2560, 1536, 2560},{1536, 2560, 1024, 2048},{1024, 2048, 1536, 1536},{1536, 1536, 2560, 1536}};
+static const Line_t pattern_R[] = { {1024, 512, 1024, 3584},{1024, 3584, 2560, 3584},{2560, 3584, 3072, 3072},{3072, 3072, 3072, 2560},{3072, 2560, 2560, 2048},{2560, 2048, 1024, 2048},{1024, 2048, 2560, 512}};
+static const Line_t pattern_r[] = { {1024, 2560, 1536, 2560},{1536, 2560, 1536, 512},{1024, 512, 2048, 512},{1536, 1536, 2048, 2560},{2048, 2560, 2560, 2560},{2560, 2560, 3072, 2048}};
+static const Line_t pattern_S[] = { {3072, 3072, 2560, 3584},{2560, 3584, 1536, 3584},{1536, 3584, 1024, 3072},{1024, 3072, 1024, 2560},{1024, 2560, 1536, 2048},{1536, 2048, 2560, 2048},{2560, 2048, 3072, 1536},{3072, 1536, 3072, 1024},{3072, 1024, 2560, 512},{2560, 512, 1536, 512},{1536, 512, 1024, 1024}};
+static const Line_t pattern_s[] = { {2560, 2048, 2048, 2560},{2048, 2560, 1536, 2560},{1536, 2560, 1024, 2048},{1024, 2048, 1536, 1536},{1536, 1536, 2048, 1536},{2048, 1536, 2560, 1024},{2560, 1024, 512, 2048},{512, 2048, 512, 1536},{512, 1536, 1024, 1024}};
+static const Line_t pattern_T[] = { {1024, 3584, 3072, 3584},{2048, 3584, 2048, 512}};
+static const Line_t pattern_t[] = { {1024, 2048, 2048, 2048},{1536, 2560, 1536, 768},{1536, 768, 1792, 512},{1792, 512, 2048, 512}};
+static const Line_t pattern_U[] = { {1024, 3584, 1024, 1024},{1024, 1024, 1536, 512},{1536, 512, 2560, 512},{2560, 512, 3072, 1024},{3072, 1024, 3072, 3584}};
+static const Line_t pattern_u[] = { {1024, 2048, 1024, 1024},{1024, 1024, 1536, 512},{1536, 512, 2048, 512},{2048, 512, 2560, 1024},{2560, 2048, 2560, 512}};
+static const Line_t pattern_V[] = { {1024, 3584, 2048, 512},{2048, 512, 3072, 3584}};
+static const Line_t pattern_v[] = { {1024, 2048, 1792, 512},{1792, 512, 2560, 2048}};
+static const Line_t pattern_W[] = { {1024, 3584, 1024, 512},{1024, 512, 2048, 2048},{2048, 2048, 3072, 512},{3072, 512, 3072, 3584}};
+static const Line_t pattern_w[] = { {1024, 2048, 1024, 1024},{1024, 1024, 1536, 512},{1536, 512, 2048, 1024},{2048, 1024, 2048, 2048},{2048, 2048, 2560, 512},{2560, 512, 3072, 1024},{3072, 1024, 3072, 2048}};
+static const Line_t pattern_X[] = { {1024, 3584, 3072, 512},{3072, 3584, 1024, 512}};
+static const Line_t pattern_x[] = { {1024, 2048, 2048, 512},{2048, 2048, 1024, 512}};
+static const Line_t pattern_Y[] = { {1024, 3584, 2048, 2048},{3072, 3584, 2048, 2048},{2048, 2048, 2048, 512}};
+static const Line_t pattern_y[] = { {1024, 2560, 1536, 1536},{1024, 512, 2048, 2560}};
+static const Line_t pattern_Z[] = { {1024, 3584, 3072, 3584},{3072, 3584, 1024, 512},{1024, 512, 3072, 512}};
+static const Line_t pattern_z[] = { {1024, 2048, 2048, 2560},{2048, 2560, 1024, 512},{1024, 512, 2048, 512}};
 
 // Digits 0-9
 static const Line_t pattern_0[] = { {1200,3295,3000,3295}, {3000,3295,3000,295}, {3000,295,1200,295}, {1200,295,1200,3295} };
@@ -99,7 +125,11 @@ static const Line_t * const patterns[] = {
   pattern_lbrack, pattern_rbrack, pattern_lbrace, pattern_rbrace,
   pattern_quote, pattern_semi, pattern_colon,
   pattern_comma, pattern_period, pattern_question,
-  pattern_at, pattern_dollar, pattern_lt, pattern_gt, pattern_pipe, pattern_tilde
+  pattern_at, pattern_dollar, pattern_lt, pattern_gt, pattern_pipe, pattern_tilde,
+  pattern_a, pattern_b, pattern_c, pattern_d, pattern_e, pattern_f, pattern_g,
+  pattern_h, pattern_i, pattern_j, pattern_k, pattern_l, pattern_m, pattern_n,
+  pattern_o, pattern_p, pattern_q, pattern_r, pattern_s, pattern_t, pattern_u,
+  pattern_v, pattern_w, pattern_x, pattern_y, pattern_z
 };
 static const uint8_t pattern_lengths[] = {
   sizeof(pattern_A)/sizeof(pattern_A[0]), sizeof(pattern_B)/sizeof(pattern_B[0]), sizeof(pattern_C)/sizeof(pattern_C[0]),
@@ -124,7 +154,16 @@ static const uint8_t pattern_lengths[] = {
   sizeof(pattern_quote)/sizeof(pattern_quote[0]), sizeof(pattern_semi)/sizeof(pattern_semi[0]), sizeof(pattern_colon)/sizeof(pattern_colon[0]),
   sizeof(pattern_comma)/sizeof(pattern_comma[0]), sizeof(pattern_period)/sizeof(pattern_period[0]), sizeof(pattern_question)/sizeof(pattern_question[0]),
   sizeof(pattern_at)/sizeof(pattern_at[0]), sizeof(pattern_dollar)/sizeof(pattern_dollar[0]), sizeof(pattern_lt)/sizeof(pattern_lt[0]),
-  sizeof(pattern_gt)/sizeof(pattern_gt[0]), sizeof(pattern_pipe)/sizeof(pattern_pipe[0]), sizeof(pattern_tilde)/sizeof(pattern_tilde[0])
+  sizeof(pattern_gt)/sizeof(pattern_gt[0]), sizeof(pattern_pipe)/sizeof(pattern_pipe[0]), sizeof(pattern_tilde)/sizeof(pattern_tilde[0]),
+  sizeof(pattern_a)/sizeof(pattern_a[0]), sizeof(pattern_b)/sizeof(pattern_b[0]), sizeof(pattern_c)/sizeof(pattern_c[0]),
+  sizeof(pattern_d)/sizeof(pattern_d[0]), sizeof(pattern_e)/sizeof(pattern_e[0]), sizeof(pattern_f)/sizeof(pattern_f[0]),
+  sizeof(pattern_g)/sizeof(pattern_g[0]), sizeof(pattern_h)/sizeof(pattern_h[0]), sizeof(pattern_i)/sizeof(pattern_i[0]),
+  sizeof(pattern_j)/sizeof(pattern_j[0]), sizeof(pattern_k)/sizeof(pattern_k[0]), sizeof(pattern_l)/sizeof(pattern_l[0]),
+  sizeof(pattern_m)/sizeof(pattern_m[0]), sizeof(pattern_n)/sizeof(pattern_n[0]), sizeof(pattern_o)/sizeof(pattern_o[0]),
+  sizeof(pattern_p)/sizeof(pattern_p[0]), sizeof(pattern_q)/sizeof(pattern_q[0]), sizeof(pattern_r)/sizeof(pattern_r[0]),
+  sizeof(pattern_s)/sizeof(pattern_s[0]), sizeof(pattern_t)/sizeof(pattern_t[0]), sizeof(pattern_u)/sizeof(pattern_u[0]),
+  sizeof(pattern_v)/sizeof(pattern_v[0]), sizeof(pattern_w)/sizeof(pattern_w[0]), sizeof(pattern_x)/sizeof(pattern_x[0]),
+  sizeof(pattern_y)/sizeof(pattern_y[0]), sizeof(pattern_z)/sizeof(pattern_z[0])
 };
 static const uint8_t patterns_count = sizeof(patterns)/sizeof(patterns[0]);
 
@@ -185,6 +224,8 @@ static uint8_t set_pattern_by_char(char c){
   uint8_t idx = 255;
   if(c>='A' && c<='Z'){
     idx = (uint8_t)(c - 'A');
+  } else if(c>='a' && c<='z'){
+    idx = (uint8_t)(c - 'a') + 66;
   } else if(c>='0' && c<='9'){
     idx = (uint8_t)(c - '0') + 26;
   } else {

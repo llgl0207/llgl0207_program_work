@@ -58,7 +58,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint16_t volume =80;
+uint16_t volume =150;
 uint8_t pitch =60;
 uint32_t last_interrupt_time=0;
 uint32_t current_time=0;
@@ -66,6 +66,16 @@ uint8_t func=0;
 static int freq=500;
 static int count_S=0;
 uint8_t percentage=5;
+
+// --- SD Waveform Variables ---
+#define SD_WAVE_MAX_LEN 32768 // 32KB Buffer
+uint8_t SD_Wave_Buffer[SD_WAVE_MAX_LEN]; // Buffer to store raw audio data
+uint32_t SD_Wave_Len = 0;                // Actual length of loaded data
+volatile uint32_t SD_Wave_Idx = 0;       // Current playback position (Read Head) - Modified by ISR
+volatile uint32_t SD_Wave_Write_Idx = 0; // Current write position (Write Head)
+uint32_t SD_Wave_Total_Data_Left = 0;    // Bytes remaining in file
+uint8_t SD_Wave_Loaded = 0;              // Flag: 1 if playing, 0 otherwise
+// -----------------------------
 
 // --- FatFS Variables (Moved to Global to avoid Stack Overflow) ---
 FATFS fs;
@@ -251,6 +261,63 @@ int main(void)
                       // DRAW_Clear();
                       DRAW_Terminal_Print("OPEN ERR\n");
                   }
+
+                  // --- Load Waveform from SD Card ---
+                  // Try to open "test.wav"
+                  res = f_open(&fil, "test.wav", FA_READ);
+                  if(res == FR_OK)
+                  {
+                      UINT br;
+                      uint8_t header[44];
+                      
+                      // Read WAV Header
+                      f_read(&fil, header, 44, &br);
+                      
+                      // Simple WAV Validation (RIFF, WAVE, fmt )
+                      if(strncmp((char*)header, "RIFF", 4) == 0 && strncmp((char*)&header[8], "WAVE", 4) == 0)
+                      {
+                          // Parse Data Size (Little Endian at offset 40)
+                          uint32_t data_size = header[40] | (header[41] << 8) | (header[42] << 16) | (header[43] << 24);
+                          SD_Wave_Total_Data_Left = data_size;
+                          
+                          // Pre-fill Buffer
+                          // We read as much as possible up to buffer size
+                          uint32_t to_read = (data_size > SD_WAVE_MAX_LEN) ? SD_WAVE_MAX_LEN : data_size;
+                          
+                          f_read(&fil, SD_Wave_Buffer, to_read, &br);
+                          
+                          SD_Wave_Idx = 0;
+                          SD_Wave_Write_Idx = (br < SD_WAVE_MAX_LEN) ? br : 0; // If full, wrap to 0
+                          SD_Wave_Total_Data_Left -= br;
+                          
+                          SD_Wave_Loaded = 1;
+                          
+                          char msg[32];
+                          sprintf(msg, "PLAYING: %d KB\n", data_size/1024);
+                          DRAW_Terminal_Print(msg);
+                          
+                          // Adjust Timer Frequency for 44.1kHz
+                          // TIM3 Clock is 84MHz (APB1 x2)
+                          // IMPORTANT: Reset Prescaler to 0 (was 41) to get full 84MHz counting
+                          __HAL_TIM_SET_PRESCALER(&htim3, 0);
+                          
+                          // Period = (84000000 / 44100) - 1 = 1904
+                          __HAL_TIM_SET_AUTORELOAD(&htim3, 1904);
+                          __HAL_TIM_SET_COUNTER(&htim3, 0);
+                          DRAW_Terminal_Print("FREQ SET: 44.1kHz\n");
+                      }
+                      else
+                      {
+                          DRAW_Terminal_Print("INVALID WAV\n");
+                          f_close(&fil);
+                      }
+                      // Note: File is kept OPEN for streaming
+                  }
+                  else
+                  {
+                      DRAW_Terminal_Print("NO test.wav FOUND\n");
+                  }
+                  // ----------------------------------
               }
               else
               {
@@ -339,15 +406,92 @@ int main(void)
 		
 		if(func==2){scale=Music_Score[count_S];HAL_Delay(0);}
 		
-		freq=440*pow(2,(scale-69.0)/12.0)*LENGTH_OF_WAVE/2;
-		int AAR = 1e6/freq;/*
-		if(Music_Score[count_S]!=0){
-			HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-		}else{
-			HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
-		}*/
-		__HAL_TIM_SET_AUTORELOAD(&htim3,AAR ); // 使用宏设置//播放音乐请注释
-		count_S++;
+		if(func==2){scale=Music_Score[count_S];HAL_Delay(0);}
+		
+        // --- SD Waveform Logic ---
+        if(SD_Wave_Loaded)
+        {
+            // Streaming Logic
+            // Calculate buffered bytes
+            uint32_t buffered;
+            uint32_t current_read_idx = SD_Wave_Idx; // Snapshot volatile variable
+            
+            if(SD_Wave_Write_Idx >= current_read_idx)
+                buffered = SD_Wave_Write_Idx - current_read_idx;
+            else
+                buffered = SD_WAVE_MAX_LEN - (current_read_idx - SD_Wave_Write_Idx);
+            
+            // If buffer is less than half full, refill
+            if(buffered < (SD_WAVE_MAX_LEN / 2))
+            {
+                UINT br;
+                uint32_t to_read = 4096; // Read 4KB chunks
+                FRESULT res;
+                
+                // Determine where to write
+                uint32_t space_at_end = SD_WAVE_MAX_LEN - SD_Wave_Write_Idx;
+                
+                if(to_read > space_at_end)
+                {
+                    // Split read
+                    res = f_read(&fil, &SD_Wave_Buffer[SD_Wave_Write_Idx], space_at_end, &br);
+                    if(res != FR_OK) { char err[20]; sprintf(err, "E1:%d\n", res); DRAW_Terminal_Print(err); }
+                    
+                    if(br < space_at_end) { 
+                        f_lseek(&fil, 44); 
+                        // Try reading rest from start
+                        UINT br2;
+                        f_read(&fil, &SD_Wave_Buffer[SD_Wave_Write_Idx + br], space_at_end - br, &br2);
+                    } 
+                    
+                    res = f_read(&fil, &SD_Wave_Buffer[0], to_read - space_at_end, &br);
+                    if(res != FR_OK) { char err[20]; sprintf(err, "E2:%d\n", res); DRAW_Terminal_Print(err); }
+                    
+                    if(br < (to_read - space_at_end)) { 
+                        f_lseek(&fil, 44);
+                        UINT br2;
+                        f_read(&fil, &SD_Wave_Buffer[br], (to_read - space_at_end) - br, &br2);
+                    }
+                    
+                    SD_Wave_Write_Idx = to_read - space_at_end;
+                }
+                else
+                {
+                    res = f_read(&fil, &SD_Wave_Buffer[SD_Wave_Write_Idx], to_read, &br);
+                    if(res != FR_OK) { char err[20]; sprintf(err, "E3:%d\n", res); DRAW_Terminal_Print(err); }
+                    
+                    if(br < to_read) { 
+                        f_lseek(&fil, 44); 
+                        UINT br2;
+                        f_read(&fil, &SD_Wave_Buffer[SD_Wave_Write_Idx + br], to_read - br, &br2);
+                    } 
+                    
+                    SD_Wave_Write_Idx += to_read;
+                    if(SD_Wave_Write_Idx >= SD_WAVE_MAX_LEN) SD_Wave_Write_Idx = 0;
+                }
+            }
+            
+            // If playing WAV, do NOT change timer frequency for music notes
+            count_S++;
+            
+            // Minimal delay to allow interrupts to process but keep loop fast
+            HAL_Delay(1); 
+        }
+        else
+        {
+            // Original Music Logic
+            freq=440*pow(2,(scale-69.0)/12.0)*LENGTH_OF_WAVE/2;
+            int AAR = 1e6/freq;
+            __HAL_TIM_SET_AUTORELOAD(&htim3,AAR ); // 使用宏设置//播放音乐请注释
+            count_S++;
+            
+            HAL_Delay(70); // Original delay for music mode
+        }
+        // -------------------------
+        
+		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_SET);
+		/*DRAW_Clear();
+        
 		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_SET);
 		/*DRAW_Clear();
 		if(func==0){DRAW_AddString("VOL MODE", 100, 1500, 1500, 10, 10);}
@@ -504,11 +648,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, dac1);
 		*/
 		
-		static short int wave_counter=0;
-		wave_counter++;
-		if(wave_counter==LENGTH_OF_WAVE)wave_counter=0;
-				//HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, Wave[wave_counter]*volume/100);
+        // --- SD Waveform Playback ---
+        if(SD_Wave_Loaded)
+        {
+            SD_Wave_Idx++;
+            if(SD_Wave_Idx >= SD_WAVE_MAX_LEN) SD_Wave_Idx = 0; // Wrap Buffer
+            
+            // Output sample from SD buffer
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, SD_Wave_Buffer[SD_Wave_Idx] * volume / 100);
+        }
+        else
+        {
+            // Fallback to internal generated wave
+            static short int wave_counter=0;
+            wave_counter++;
+            if(wave_counter==LENGTH_OF_WAVE)wave_counter=0;
+            //HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, Wave[wave_counter]*volume/100);
+        }
+        
 		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, Wave[wave_counter]);
 		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, Wave[wave_counter]);
 		/*
