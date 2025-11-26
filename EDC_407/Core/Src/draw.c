@@ -8,25 +8,25 @@ typedef struct { uint16_t x0,y0,x1,y1; } Line_t;
 // For brevity, include a compact set of patterns (A..Z) copied from main.c
 // In a real library we'd store these more compactly or generate them.
 static const Line_t pattern_A[] = { {0,0,2048,4096}, {2048,4096,4096,0}, {1024,2048,3072,2048} };
-static const Line_t pattern_B[] = { {0,0,0,4096}, {0,4096,2048,4096}, {2048,4096,3072,3072}, {3072,3072,2048,2048}, {2048,2048,0,2048}, {2048,2048,3072,1024}, {3072,1024,2048,0}, {2048,0,0,0} };
+static const Line_t pattern_B[] = { {0,0,0,4096}, {0,4096,1365,4096}, {1365,4096,2048,3413}, {2048,3413,2048,2730}, {2048,2730,1365,2048}, {1365,2048,0,2048}, {0,2048,1365,2048}, {1365,2048,2048,1365},{2048,1365,2048,682},{2048,682,1365,0},{1365,0,0,0} };
 static const Line_t pattern_C[] = { {3000,1000,2000,800}, {2000,800,1200,1400}, {1200,1400,1000,2600}, {1000,2600,1200,3200}, {1200,3200,2000,3800}, {2000,3800,3000,3600} };
-static const Line_t pattern_D[] = { {1200,800,1200,3800}, {1200,800,2200,1200}, {2200,1200,2600,2000}, {2600,2000,2200,3000}, {2200,3000,1200,3200} };
+static const Line_t pattern_D[] = { {1200,800,1200,3800}, {1200,3800,2200,3800}, {2200,3800,2600,2800}, {2600,2800,2600,1800}, {2600,1800,2200,800},{2200,800,1200,800} };
 static const Line_t pattern_E[] = { {1200,800,1200,3800}, {1200,800,3000,800}, {1200,2300,2600,2300}, {1200,3800,3000,3800} };
 static const Line_t pattern_F[] = { {1200,3295,1200,295}, {1200,3295,3000,3295}, {1200,1795,2600,1795} };
 static const Line_t pattern_G[] = { {3000,1200,2000,800}, {2000,800,1200,1400}, {1200,1400,1000,2600}, {1000,2600,1200,3200}, {1200,3200,2200,3800}, {2200,3800,3000,3600}, {2500,2500,3000,2500} };
 static const Line_t pattern_H[] = { {1200,800,1200,3800}, {3000,800,3000,3800}, {1200,2300,3000,2300} };
-static const Line_t pattern_I[] = { {2000,800,2800,800}, {2400,800,2400,3800}, {2000,3800,2800,3800} };
-static const Line_t pattern_J[] = { {1400,3295,3400,3295}, {2400,3295,2400,1095}, {2400,1095,2000,495} };
-static const Line_t pattern_K[] = { {1200,800,1200,3800}, {3000,800,1200,2300}, {1200,2300,3000,3800} };
-static const Line_t pattern_L[] = { {1200,3295,1200,295}, {1200,295,3000,295} };
+static const Line_t pattern_I[] = { {2000,800,2500,800}, {2250,800,2250,3800}, {2000,3800,2500,3800} };
+static const Line_t pattern_J[] = { {1700,3295,2300,3295}, {2000,3295,2000,1095}, {2000,1095,1800,1000},{1800,1000,1700,1000} };
+static const Line_t pattern_K[] = { {1200,800,1200,3800}, {2500,800,1200,2300}, {1200,2300,2500,3800} };
+static const Line_t pattern_L[] = { {1200,3295,1200,295}, {1200,295,2400,295} };
 static const Line_t pattern_M[] = { {1200,3295,1200,295}, {1200,3295,2200,2095}, {2200,2095,3000,3295}, {3000,3295,3000,295} };
 static const Line_t pattern_N[] = { {1200,3295,1200,295}, {1200,3295,3000,295}, {3000,3295,3000,295} };
 static const Line_t pattern_O[] = { {2000,3295,3000,2895}, {3000,2895,3200,1495}, {3200,1495,2600,495}, {2600,495,1600,895}, {1600,895,1400,2095}, {1400,2095,2000,3295} };
-static const Line_t pattern_P[] = { {1200,3295,1200,295}, {1200,3295,2600,2995}, {2600,2995,1200,2095} };
+static const Line_t pattern_P[] = { {1200,3295,1200,295}, {1200,3295,2300,3295}, {2300,3295,2500,2795},{2500,2795,2500,2395},{2500,2395,2300,1795},{2300,1795,1200,1795} };
 static const Line_t pattern_Q[] = { {2000,3295,3000,2895}, {3000,2895,3200,1495}, {3200,1495,2600,495}, {2600,495,1600,895}, {1600,895,1400,2095}, {1400,2095,2000,3295}, {2500,1095,3200,295} };
-static const Line_t pattern_R[] = { {1200,3295,1200,295}, {1200,3295,2600,2995}, {2600,2995,1200,2095}, {1200,2095,3000,295} };
-static const Line_t pattern_S[] = { {1024,0,3072,1024}, {3072,1024,1024,3072}, {1024,3072,3072,4096} };
-static const Line_t pattern_T[] = { {1400,3295,3400,3295}, {2400,3295,2400,295} };
+static const Line_t pattern_R[] = { {1200,3295,1200,295}, {1200,3295,2300,3295}, {2300,3295,2500,2795},{2500,2795,2500,2395},{2500,2395,2300,1795},{2300,1795,1200,1795}, {1200,1795,3000,295} };
+static const Line_t pattern_S[] = { {1365,0,2048,0}, {2048,0,3072,1024}, {3072,1024,1024,3072},{1024,3072,2048,4096},{2048,4096,2730,4096} };
+static const Line_t pattern_T[] = { {2000,3295,2800,3295}, {2400,3295,2400,295} };
 static const Line_t pattern_U[] = { {1200,3295,1200,895}, {1200,895,2200,295}, {2200,295,3200,895}, {3200,895,3200,3295} };
 static const Line_t pattern_V[] = { {1200,3295,2200,295}, {2200,295,3200,3295} };
 static const Line_t pattern_W[] = { {1200,3295,1600,295}, {1600,295,2200,2095}, {2200,2095,2800,295}, {2800,295,3200,3295} };
@@ -138,11 +138,6 @@ static int32_t offset_y = 0;
 
 // transformed endpoints cache for current line
 static int32_t tx0, ty0, tx1, ty1;
-
-// Fixed-point math variables for high-speed drawing
-static int32_t fp_x, fp_y;
-static int32_t fp_dx, fp_dy;
-
 // Memory Pool Settings
 #define MAX_DRAW_OBJS 8
 #define MAX_STR_LEN 32
@@ -342,24 +337,10 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
     if(ty1 < 0) ty1 = 0; if(ty1 > 4095) ty1 = 4095;
     int32_t dx = tx0 - tx1;
     int32_t dy = ty0 - ty1;
-    // Increase drawing speed: fewer steps per line
-    // Divide distance by 8 to reduce total steps (faster drawing)
-    step_max = (uint16_t)(sqrt((double)dx*dx + (double)dy*dy) / 8);
-    if(step_max < 1) step_max = 1;
+    step_max = (uint16_t)(sqrt((double)dx*dx + (double)dy*dy)*1);
     current_step = 0;
     
-    // Initialize Fixed-Point variables (16.16 format)
-    fp_x = tx0 << 16;
-    fp_y = ty0 << 16;
-    if(step_max > 0) {
-        fp_dx = ((tx1 - tx0) << 16) / step_max;
-        fp_dy = ((ty1 - ty0) << 16) / step_max;
-    } else {
-        fp_dx = 0;
-        fp_dy = 0;
-    }
-
-    // Output start point immediately
+    // Output start point immediately to ensure we don't skip it
     HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)tx0);
     HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)ty0);
   }
@@ -368,20 +349,14 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
     if(current_step > step_max){
         state_done = 2;
     } else {
-        // Incremental update using fixed-point math (No division!)
-        fp_x += fp_dx;
-        fp_y += fp_dy;
-        
-        uint32_t curX = fp_x >> 16;
-        uint32_t curY = fp_y >> 16;
-        
-        // Safety clipping
-        if(curX > 4095) curX = 4095;
-        if(curY > 4095) curY = 4095;
-
-        // Output current point
-        HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, curX);
-        HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, curY);
+        if(step_max!=0){
+          int32_t curX = (tx0 * (int32_t)(step_max - current_step) + tx1 * (int32_t)current_step) / (int32_t)step_max;
+          int32_t curY = (ty0 * (int32_t)(step_max - current_step) + ty1 * (int32_t)current_step) / (int32_t)step_max;
+          if(curX<0) curX=0; if(curX>4095) curX=4095;
+          if(curY<0) curY=0; if(curY>4095) curY=4095;
+          HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)curX);
+          HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)curY);
+        }
     }
   }
   else if(state_done==2){
@@ -439,46 +414,22 @@ void DRAW_TimerStep(TIM_HandleTypeDef *htim){
         }
 
         // 4. Setup next char
-        while(1){
-            if(current_char_idx >= MAX_STR_LEN || draw_pool[current_obj_idx].text[current_char_idx] == '\0'){
-                 // End of string reached while skipping
-                 // Force a quick exit to trigger object switch on next interrupt
-                 // We can't easily switch object here recursively without refactoring.
-                 // Simplest way: set a dummy pattern (space) or just let the next interrupt handle the object switch logic again.
-                 // But the object switch logic is at the TOP of this block (line_index == 0).
-                 // So if we just return, next interrupt line_index is still 0? No, we need to ensure we come back here.
-                 // Actually, if we fail to set a pattern, we shouldn't start drawing.
-                 
-                 // Let's try to find the next object immediately here?
-                 // It's getting complicated.
-                 
-                 // Alternative: If invalid, set pattern to a "space" (empty pattern) so it "draws" nothing quickly.
-                 // But we don't have an empty pattern.
-                 
-                 // Let's just use pattern_A as a fallback but with 0 scale? No.
-                 
-                 // Best approach: Loop until we find a valid char or end of string.
-                 break; 
-            }
-
-            char nc = draw_pool[current_obj_idx].text[current_char_idx];
-            if(set_pattern_by_char(nc)){
-                 // Update global scale/offset for the drawing engine
-                 scale_x_pct = draw_pool[current_obj_idx].sx;
-                 scale_y_pct = draw_pool[current_obj_idx].sy;
-                 
-                 int32_t nminx, nmaxx;
-                 compute_pattern_minmax_x(current_pattern, current_pattern_length, &nminx, &nmaxx);
-                 int32_t left_offset = current_char_x - (nminx * (int32_t)scale_x_pct) / 100;
-                 
-                 offset_x = (int16_t)left_offset;
-                 offset_y = (int16_t)draw_pool[current_obj_idx].y;
-                 break; // Found a valid char, ready to draw
-            } else {
-                 // Char not found (e.g. space or invalid), treat as space
-                 current_char_x += (2000 * (int32_t)draw_pool[current_obj_idx].sx) / 100 + draw_pool[current_obj_idx].spacing;
-                 current_char_idx++;
-            }
+        char nc = draw_pool[current_obj_idx].text[current_char_idx];
+        if(set_pattern_by_char(nc)){
+             // Update global scale/offset for the drawing engine
+             scale_x_pct = draw_pool[current_obj_idx].sx;
+             scale_y_pct = draw_pool[current_obj_idx].sy;
+             
+             int32_t nminx, nmaxx;
+             compute_pattern_minmax_x(current_pattern, current_pattern_length, &nminx, &nmaxx);
+             int32_t left_offset = current_char_x - (nminx * (int32_t)scale_x_pct) / 100;
+             
+             offset_x = (int16_t)left_offset;
+             offset_y = (int16_t)draw_pool[current_obj_idx].y;
+        } else {
+             // Char not found? Skip or stop?
+             // For now, set_pattern_by_char returns 0.
+             // We should probably handle spaces.
         }
     }
   }

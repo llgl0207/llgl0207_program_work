@@ -20,7 +20,10 @@
 #include "main.h"
 #include "can.h"
 #include "dac.h"
+#include "dma.h"
+#include "fatfs.h"
 #include "i2c.h"
+#include "sdio.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -64,6 +67,11 @@ static int freq=500;
 static int count_S=0;
 uint8_t percentage=5;
 
+// --- FatFS Variables (Moved to Global to avoid Stack Overflow) ---
+FATFS fs;
+FIL fil;
+uint8_t test_buff[512];
+// -----------------------------------------------------------------
 
 int scale=60;
 //#define LENGTH 32
@@ -108,7 +116,11 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  FRESULT res;
+  // FATFS fs; // Moved to global
+  // FIL fil;  // Moved to global
+  char sd_buf[32];
+  UINT bw;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -129,6 +141,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_CAN1_Init();
   MX_DAC_Init();
   MX_I2C1_Init();
@@ -138,14 +151,124 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM8_Init();
   MX_TIM3_Init();
+  // MX_SDIO_SD_Init(); // <--- 注释掉自动生成的初始化，改为手动调用
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
   /* 初始化绘图库 */
   DRAW_Init(1000); 
-  HAL_TIM_Base_Start_IT(&htim14);  // 启动TIM14中断
+  HAL_TIM_Base_Start_IT(&htim14);  // 立即启动绘图，确保屏幕有显示
 	
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_TIM_Encoder_Start(&htim8, TIM_CHANNEL_ALL);
+
+  // --- SD卡调试代码 ---
+  // 坐标调整：X=1000 (偏左中), Y=2000 (垂直居中), 缩放=10% (较小)
+  DRAW_Clear();
+  DRAW_AddString("STEP 1: INIT", 100, 1000, 2000, 10, 10);
+  HAL_Delay(1000); 
+
+  // 手动初始化 SDIO
+  MX_SDIO_SD_Init();
+  
+  DRAW_Clear();
+  DRAW_AddString("STEP 2: CHECK", 100, 1000, 2000, 10, 10);
+  HAL_Delay(1000);
+
+  if(hsd.State == HAL_SD_STATE_READY)
+  {
+      HAL_SD_CardInfoTypeDef CardInfo;
+      if(HAL_SD_GetCardInfo(&hsd, &CardInfo) == HAL_OK)
+      {
+          char info_buf[32];
+          sprintf(info_buf, "TYPE:%d", CardInfo.CardType);
+          DRAW_Clear();
+          DRAW_AddString(info_buf, 100, 1000, 2000, 10, 10);
+          HAL_Delay(500);
+          
+          // 尝试读取
+          // uint8_t test_buff[512]; // Moved to global
+          if(HAL_SD_ReadBlocks(&hsd, test_buff, 0, 1, 1000) == HAL_OK)
+          {
+              DRAW_Clear();
+              DRAW_AddString("READ OK", 100, 1000, 2000, 10, 10);
+              
+              // --- 尝试 FatFS 挂载 ---
+              HAL_Delay(1000);
+              res = f_mount(&fs, "0:", 1);
+              if(res == FR_OK)
+              {
+                  DRAW_Clear();
+                  DRAW_AddString("MOUNT OK", 100, 1000, 2000, 10, 10);
+                  
+                  // 写入测试
+                  res = f_open(&fil, "test.txt", FA_CREATE_ALWAYS | FA_WRITE);
+                  if(res == FR_OK)
+                  {
+                      sprintf(sd_buf, "FatFS Works!"); // 写入简单字符串
+                      f_write(&fil, sd_buf, strlen(sd_buf), &bw);
+                      f_close(&fil);
+                      DRAW_Clear();
+                      DRAW_AddString("WRITE OK", 100, 1000, 2000, 10, 10);
+                      
+                      HAL_Delay(1000);
+                      
+                      // --- 读取验证 ---
+                      res = f_open(&fil, "test.txt", FA_READ);
+                      if(res == FR_OK)
+                      {
+                          char read_buf[32] = {0};
+                          UINT br;
+                          f_read(&fil, read_buf, sizeof(read_buf)-1, &br);
+                          f_close(&fil);
+                          
+                          DRAW_Clear();
+                          // 显示读取到的内容，证明写入成功
+                          DRAW_AddString(read_buf, 100, 1000, 2000, 10, 10);
+                      }
+                      else
+                      {
+                          DRAW_Clear();
+                          DRAW_AddString("READ FAIL", 100, 1000, 2000, 10, 10);
+                      }
+                  }
+                  else
+                  {
+                      DRAW_Clear();
+                      DRAW_AddString("OPEN ERR", 100, 1000, 2000, 10, 10);
+                  }
+              }
+              else
+              {
+                  char mnt_err[32];
+                  sprintf(mnt_err, "MNT ERR:%d", res);
+                  DRAW_Clear();
+                  DRAW_AddString(mnt_err, 100, 1000, 2000, 10, 10);
+              }
+              // -----------------------
+          }
+          else
+          {
+              char err_buf[32];
+              sprintf(err_buf, "ERR:%d", hsd.ErrorCode);
+              DRAW_Clear();
+              DRAW_AddString(err_buf, 100, 1000, 2000, 10, 10);
+          }
+      }
+      else
+      {
+          DRAW_Clear();
+          DRAW_AddString("INFO ERR", 100, 1000, 2000, 10, 10);
+      }
+  }
+  else
+  {
+      char state_buf[32];
+      sprintf(state_buf, "FAIL:%d", hsd.State);
+      DRAW_Clear();
+      DRAW_AddString(state_buf, 100, 1000, 2000, 10, 10);
+  }
+  // -------------------
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -176,7 +299,7 @@ int main(void)
     
     // 6. 延时刷新 (例如 200ms 更新一次)
     //HAL_Delay(200);
-
+    
 		HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 	
 		static uint16_t encoder=0;
@@ -209,7 +332,7 @@ int main(void)
 		__HAL_TIM_SET_AUTORELOAD(&htim3,AAR ); // 使用宏设置//播放音乐请注释
 		count_S++;
 		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_SET);
-		DRAW_Clear();
+		/*DRAW_Clear();
 		if(func==0){DRAW_AddString("VOL MODE", 100, 1500, 1500, 10, 10);}
 		if(func==1){DRAW_AddString("PITCH MODE", 100, 1500, 1500, 10, 10);}
 		if(func==2){DRAW_AddString("MUSIC MODE", 100, 1500, 1500, 10, 10);}
@@ -221,7 +344,7 @@ int main(void)
 		DRAW_AddString(buf, 100, 3000, 3000, 20, 20);     // 动态数值
 		DRAW_AddString("VOL", 100, 1500, 2000, 10, 10); // 静态标题
 		DRAW_AddString(buf1, 100, 3000, 2000, 20, 20);     // 动态数值
-		
+		*/
 		HAL_Delay(70);
 		
 		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_RESET);
@@ -258,7 +381,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -397,9 +520,11 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
+  // __disable_irq(); 
   while (1)
   {
+      HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+      HAL_Delay(100); // 快速闪烁表示错误
   }
   /* USER CODE END Error_Handler_Debug */
 }

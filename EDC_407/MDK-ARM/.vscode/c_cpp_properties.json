@@ -8,11 +8,15 @@
                 "e:\\github\\llgl0207_program_work\\EDC_407\\Drivers\\STM32F4xx_HAL_Driver\\Inc\\Legacy",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\Drivers\\CMSIS\\Device\\ST\\STM32F4xx\\Include",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\Drivers\\CMSIS\\Include",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\FATFS\\Target",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\FATFS\\App",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FatFs\\src",
                 "D:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include",
                 "D:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include\\rw",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\MDK-ARM",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\Core\\Src",
-                "e:\\github\\llgl0207_program_work\\EDC_407\\Drivers\\STM32F4xx_HAL_Driver\\Src"
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Drivers\\STM32F4xx_HAL_Driver\\Src",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FatFs\\src\\option"
             ],
             "defines": [
                 "USE_HAL_DRIVER",
