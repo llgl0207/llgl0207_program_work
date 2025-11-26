@@ -1,3 +1,31 @@
-Load "EDC_407\\EDC_407.axf" 
-Erase Done.Programming Done.Verify OK.Application running ...
-Flash Load finished at 16:54:51
+*** Using Compiler 'V5.06 update 6 (build 750)', folder: 'D:\Program Files\Keil_v5\ARM\ARMCC\Bin'
+Build target 'EDC_407'
+compiling main.c...
+../Core/Src/main.c(350): warning:  #9-D: nested comment is not allowed
+  		/*DRAW_Clear();
+../Core/Src/main.c(131): warning:  #177-D: variable "res"  was declared but never referenced
+    FRESULT res;
+../Core/Src/main.c(134): warning:  #177-D: variable "sd_buf"  was declared but never referenced
+    char sd_buf[32];
+../Core/Src/main.c(135): warning:  #177-D: variable "bw"  was declared but never referenced
+    UINT bw;
+../Core/Src/main.c(194): warning:  #177-D: variable "count"  was declared but never referenced
+    int count = 0;
+../Core/Src/main.c(195): warning:  #177-D: variable "buf"  was declared but never referenced
+    char buf[32];
+../Core/Src/main.c(196): warning:  #177-D: variable "buf1"  was declared but never referenced
+  	char buf1[32];
+../Core/Src/main.c(67): warning:  #177-D: variable "freq"  was declared but never referenced
+  static int freq=500;
+../Core/Src/main.c(68): warning:  #550-D: variable "count_S"  was set but never used
+  static int count_S=0;
+../Core/Src/main.c: 9 warnings, 0 errors
+compiling freertos.c...
+../Core/Src/freertos.c(261): warning:  #550-D: variable "res"  was set but never used
+              FRESULT res;
+../Core/Src/freertos.c: 1 warning, 0 errors
+linking...
+Program Size: Code=44544 RO-data=5400 RW-data=912 ZI-data=120496  
+FromELF: creating hex file...
+"EDC_407\EDC_407.axf" - 0 Error(s), 10 Warning(s).
+Build Time Elapsed:  00:00:04

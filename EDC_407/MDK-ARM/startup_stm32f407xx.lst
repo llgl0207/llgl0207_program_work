@@ -849,11 +849,11 @@ erwork --depend=edc_407\startup_stm32f407xx.d -oedc_407\startup_stm32f407xx.o -
 ARM Macro Assembler    Page 14 
 
 
-I.\RTE\_EDC_407 -I"D:\Program Files\Keil_v5\ARM\PACK\ARM\CMSIS\5.4.0\CMSIS\Core
-\Include" -I"D:\Program Files\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.8.0\Drivers
-\CMSIS\Device\ST\STM32F4xx\Include" --predefine="__UVISION_VERSION SETA 526" --
-predefine="_RTE_ SETA 1" --predefine="STM32F407xx SETA 1" --list=startup_stm32f
-407xx.lst startup_stm32f407xx.s
+I../Drivers/CMSIS/Include -I.\RTE\_EDC_407 -I"D:\Program Files\Keil_v5\ARM\PACK
+\ARM\CMSIS\5.4.0\CMSIS\Core\Include" -I"D:\Program Files\Keil_v5\ARM\PACK\Keil\
+STM32F4xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include" --predefine="__U
+VISION_VERSION SETA 526" --predefine="_RTE_ SETA 1" --predefine="STM32F407xx SE
+TA 1" --list=startup_stm32f407xx.lst startup_stm32f407xx.s
 
 
 

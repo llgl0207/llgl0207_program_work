@@ -11,12 +11,17 @@
                 "e:\\github\\llgl0207_program_work\\EDC_407\\FATFS\\Target",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\FATFS\\App",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FatFs\\src",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FreeRTOS\\Source\\include",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FreeRTOS\\Source\\CMSIS_RTOS",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FreeRTOS\\Source\\portable\\RVDS\\ARM_CM4F",
                 "D:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include",
                 "D:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include\\rw",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\MDK-ARM",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\Core\\Src",
                 "e:\\github\\llgl0207_program_work\\EDC_407\\Drivers\\STM32F4xx_HAL_Driver\\Src",
-                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FatFs\\src\\option"
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FatFs\\src\\option",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FreeRTOS\\Source",
+                "e:\\github\\llgl0207_program_work\\EDC_407\\Middlewares\\Third_Party\\FreeRTOS\\Source\\portable\\MemMang"
             ],
             "defines": [
                 "USE_HAL_DRIVER",

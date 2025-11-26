@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 #include "can.h"
 #include "dac.h"
 #include "dma.h"
@@ -109,6 +110,7 @@ uint8_t datt[18]={0};
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -177,180 +179,15 @@ int main(void)
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_TIM_Encoder_Start(&htim8, TIM_CHANNEL_ALL);
 
-  // --- SD卡调试代码 ---
-  // 坐标调整：X=1000 (偏左中), Y=2000 (垂直居中), 缩放=10% (较小)
-  // DRAW_Clear();
-  DRAW_Terminal_Print("STEP 1: INIT\n");
-  HAL_Delay(1000); 
-
-  // 手动初始化 SDIO
-  MX_SDIO_SD_Init();
-  
-  // DRAW_Clear();
-  DRAW_Terminal_Print("STEP 2: CHECK\n");
-  HAL_Delay(1000);
-
-  // Test Scrolling
-  for(int i=0; i<5; i++){
-      char buf[20];
-      sprintf(buf, "Line %d\n", i+3);
-      DRAW_Terminal_Print(buf);
-      HAL_Delay(200);
-  }
-	
-  if(hsd.State == HAL_SD_STATE_READY)
-  {
-      HAL_SD_CardInfoTypeDef CardInfo;
-      if(HAL_SD_GetCardInfo(&hsd, &CardInfo) == HAL_OK)
-      {
-          char info_buf[32];
-          sprintf(info_buf, "TYPE:%d\n", CardInfo.CardType);
-          // DRAW_Clear();
-          DRAW_Terminal_Print(info_buf);
-          HAL_Delay(500);
-          
-          // 尝试读取
-          // uint8_t test_buff[512]; // Moved to global
-          if(HAL_SD_ReadBlocks(&hsd, test_buff, 0, 1, 1000) == HAL_OK)
-          {
-              // DRAW_Clear();
-              DRAW_Terminal_Print("READ OK\n");
-              
-              // --- 尝试 FatFS 挂载 ---
-              HAL_Delay(1000);
-              res = f_mount(&fs, "0:", 1);
-              if(res == FR_OK)
-              {
-                  // DRAW_Clear();
-                  DRAW_Terminal_Print("MOUNT OK\n");
-                  
-                  // 写入测试
-                  res = f_open(&fil, "test.txt", FA_CREATE_ALWAYS | FA_WRITE);
-                  if(res == FR_OK)
-                  {
-                      sprintf(sd_buf, "FatFS Works!"); // 写入简单字符串
-                      f_write(&fil, sd_buf, strlen(sd_buf), &bw);
-                      f_close(&fil);
-                      // DRAW_Clear();
-                      DRAW_Terminal_Print("WRITE OK\n");
-                      
-                      HAL_Delay(1000);
-                      
-                      // --- 读取验证 ---
-                      res = f_open(&fil, "test.txt", FA_READ);
-                      if(res == FR_OK)
-                      {
-                          char read_buf[32] = {0};
-                          UINT br;
-                          f_read(&fil, read_buf, sizeof(read_buf)-1, &br);
-                          f_close(&fil);
-                          
-                          // DRAW_Clear();
-                          // 显示读取到的内容，证明写入成功
-                          DRAW_Terminal_Print(read_buf);
-                          DRAW_Terminal_Print("\n");
-                      }
-                      else
-                      {
-                          // DRAW_Clear();
-                          DRAW_Terminal_Print("READ FAIL\n");
-                      }
-                  }
-                  else
-                  {
-                      // DRAW_Clear();
-                      DRAW_Terminal_Print("OPEN ERR\n");
-                  }
-
-                  // --- Load Waveform from SD Card ---
-                  // Try to open "test.wav"
-                  res = f_open(&fil, "test.wav", FA_READ);
-                  if(res == FR_OK)
-                  {
-                      UINT br;
-                      uint8_t header[44];
-                      
-                      // Read WAV Header
-                      f_read(&fil, header, 44, &br);
-                      
-                      // Simple WAV Validation (RIFF, WAVE, fmt )
-                      if(strncmp((char*)header, "RIFF", 4) == 0 && strncmp((char*)&header[8], "WAVE", 4) == 0)
-                      {
-                          // Parse Data Size (Little Endian at offset 40)
-                          uint32_t data_size = header[40] | (header[41] << 8) | (header[42] << 16) | (header[43] << 24);
-                          SD_Wave_Total_Data_Left = data_size;
-                          
-                          // Pre-fill Buffer
-                          // We read as much as possible up to buffer size
-                          uint32_t to_read = (data_size > SD_WAVE_MAX_LEN) ? SD_WAVE_MAX_LEN : data_size;
-                          
-                          f_read(&fil, SD_Wave_Buffer, to_read, &br);
-                          
-                          SD_Wave_Idx = 0;
-                          SD_Wave_Write_Idx = (br < SD_WAVE_MAX_LEN) ? br : 0; // If full, wrap to 0
-                          SD_Wave_Total_Data_Left -= br;
-                          
-                          SD_Wave_Loaded = 1;
-                          
-                          char msg[32];
-                          sprintf(msg, "PLAYING: %d KB\n", data_size/1024);
-                          DRAW_Terminal_Print(msg);
-                          
-                          // Adjust Timer Frequency for 44.1kHz
-                          // TIM3 Clock is 84MHz (APB1 x2)
-                          // IMPORTANT: Reset Prescaler to 0 (was 41) to get full 84MHz counting
-                          __HAL_TIM_SET_PRESCALER(&htim3, 0);
-                          
-                          // Period = (84000000 / 44100) - 1 = 1904
-                          __HAL_TIM_SET_AUTORELOAD(&htim3, 1904);
-                          __HAL_TIM_SET_COUNTER(&htim3, 0);
-                          DRAW_Terminal_Print("FREQ SET: 44.1kHz\n");
-                      }
-                      else
-                      {
-                          DRAW_Terminal_Print("INVALID WAV\n");
-                          f_close(&fil);
-                      }
-                      // Note: File is kept OPEN for streaming
-                  }
-                  else
-                  {
-                      DRAW_Terminal_Print("NO test.wav FOUND\n");
-                  }
-                  // ----------------------------------
-              }
-              else
-              {
-                  char mnt_err[32];
-                  sprintf(mnt_err, "MNT ERR:%d\n", res);
-                  // DRAW_Clear();
-                  DRAW_Terminal_Print(mnt_err);
-              }
-              // -----------------------
-          }
-          else
-          {
-              char err_buf[32];
-              sprintf(err_buf, "ERR:%d\n", hsd.ErrorCode);
-              // DRAW_Clear();
-              DRAW_Terminal_Print(err_buf);
-          }
-      }
-      else
-      {
-          // DRAW_Clear();
-          DRAW_Terminal_Print("INFO ERR\n");
-      }
-  }
-  else
-  {
-      char state_buf[32];
-      sprintf(state_buf, "FAIL:%d\n", hsd.State);
-      // DRAW_Clear();
-      DRAW_Terminal_Print(state_buf);
-  }
-  // -------------------
   /* USER CODE END 2 */
+
+  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -360,6 +197,7 @@ int main(void)
    //DRAW_Clear();
    DRAW_Terminal_Print("abcdefghijklmnopqrstuvwxyz");
    //DRAW_AddString("c", 100, 0, 0, 100, 100);
+#if 0
   while (1)
   {
     // 1. 格式化变量到字符串
@@ -526,10 +364,12 @@ int main(void)
 		
 		//HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_RESET);
 		//HAL_Delay(150);
+  }
+#endif
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+  // }
   /* USER CODE END 3 */
 }
 
@@ -638,32 +478,31 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // 然后在main循环里检查这个标志位来处理事件
   
 }
+/* HAL_TIM_PeriodElapsedCallback for TIM3 moved to the bottom of the file */
+
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM7 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if(htim->Instance == TIM3)
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM7)
   {
-		/*
-    static uint32_t counter1 = 0;
-		static uint32_t counter2 = 0;
-		static int mcount;
-		static int freq=100;
-		static int count=0;
-		count++;
-		mcount=1.0/freq*1000;
-		if(count%100==0){freq++;}
-    counter1++;
-		counter2++;
-		if(freq==1000){freq=0;}
-		if(counter1==mcount){counter1=0;}
-		if(counter2==mcount){counter2=0;}
-		int dac0=100*(1+sin(2*PI/mcount*counter1));
-		int dac1=100*(1+cos(2*PI/mcount*counter2));
-		//int dac0=counter1;
-		//int dac1=counter2;
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, dac0);
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, dac1);
-		*/
-		
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+  if(htim->Instance == TIM3)
+  {
         // --- SD Waveform Playback ---
         if(SD_Wave_Loaded)
         {
@@ -679,24 +518,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             static short int wave_counter=0;
             wave_counter++;
             if(wave_counter==LENGTH_OF_WAVE)wave_counter=0;
-            //HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
             __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, Wave[wave_counter]*volume/100);
         }
-        
-		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, Wave[wave_counter]);
-		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, Wave[wave_counter]);
-		/*
-		static uint32_t counter = 0;
-		counter+=2;
-		if(counter==18000){counter=0;}
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, datt[counter]);
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, datt[counter+1]);
-		*/
   }
+  /* USER CODE END Callback 1 */
 }
-
-
-/* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.

@@ -45,4 +45,17 @@ edc_407\diskio.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h
 edc_407\diskio.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h
 edc_407\diskio.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h
 edc_407\diskio.o: ../FATFS/Target/bsp_driver_sd.h
-edc_407\diskio.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS/cmsis_os.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
+edc_407\diskio.o: ../Core/Inc/FreeRTOSConfig.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/semphr.h
+edc_407\diskio.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h
