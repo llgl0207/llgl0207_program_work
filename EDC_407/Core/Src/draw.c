@@ -180,15 +180,29 @@ static int32_t offset_x = 0;
 static int32_t offset_y = 0;
 
 // Memory Pool Settings
-#define MAX_DRAW_OBJS 16
+#define MAX_DRAW_OBJS 32
 #define MAX_STR_LEN 64
 
 typedef struct {
   uint8_t active;
-  char text[MAX_STR_LEN];
-  int32_t x, y;
-  uint16_t sx, sy;
-  uint16_t spacing;
+  DrawType type;
+  union {
+      struct {
+          char text[MAX_STR_LEN];
+          int32_t x, y;
+          uint16_t sx, sy;
+          uint16_t spacing;
+      } text_data;
+      struct {
+          int32_t x0, y0, x1, y1;
+      } line_data;
+      struct {
+          int32_t x, y, w, h;
+      } rect_data;
+      struct {
+          int32_t x, y, r;
+      } circle_data;
+  } data;
 } DrawObj;
 
 static DrawObj draw_pool[MAX_DRAW_OBJS];
@@ -296,80 +310,145 @@ void DRAW_Render(void){
         for(int i=0; i<MAX_DRAW_OBJS; i++){
             if(!draw_pool[i].active) continue;
             
-            // Render string
-            int32_t cursor_x = draw_pool[i].x;
-            int32_t cursor_y = draw_pool[i].y;
-            uint16_t sx = draw_pool[i].sx;
-            uint16_t sy = draw_pool[i].sy;
-            
-            for(int c=0; c<MAX_STR_LEN; c++){
-                char ch = draw_pool[i].text[c];
-                if(ch == 0) break;
-                if(ch == ' '){
-                    cursor_x += (2000 * (int32_t)sx) / 100 + draw_pool[i].spacing;
-                    continue;
-                }
+            if(draw_pool[i].type == DRAW_TYPE_TEXT)
+            {
+                // Render string
+                int32_t cursor_x = draw_pool[i].data.text_data.x;
+                int32_t cursor_y = draw_pool[i].data.text_data.y;
+                uint16_t sx = draw_pool[i].data.text_data.sx;
+                uint16_t sy = draw_pool[i].data.text_data.sy;
                 
-                if(set_pattern_by_char(ch)){
-                    int32_t minx, maxx;
-                    compute_pattern_minmax_x(current_pattern, current_pattern_length, &minx, &maxx);
-                    
-                    // Scale up for letters (Unit Length Mode -> DAC Mode)
-                    int32_t pre_scale = 1;
-                    if((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')){
-                        pre_scale = 512;
+                for(int c=0; c<MAX_STR_LEN; c++){
+                    char ch = draw_pool[i].data.text_data.text[c];
+                    if(ch == 0) break;
+                    if(ch == ' '){
+                        cursor_x += (2000 * (int32_t)sx) / 100 + draw_pool[i].data.text_data.spacing;
+                        continue;
                     }
                     
-                    minx *= pre_scale;
-                    maxx *= pre_scale;
-                    
-                    // Draw each line in the pattern
-                    for(int l=0; l<current_pattern_length; l++){
-                        int32_t x0 = current_pattern[l].x0 * pre_scale;
-                        int32_t y0 = current_pattern[l].y0 * pre_scale;
-                        int32_t x1 = current_pattern[l].x1 * pre_scale;
-                        int32_t y1 = current_pattern[l].y1 * pre_scale;
+                    if(set_pattern_by_char(ch)){
+                        int32_t minx, maxx;
+                        compute_pattern_minmax_x(current_pattern, current_pattern_length, &minx, &maxx);
                         
-                        // Transform
-                        int32_t tx0 = (x0 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100;
-                        int32_t ty0 = (y0 * (int32_t)sy) / 100 + cursor_y;
-                        int32_t tx1 = (x1 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100;
-                        int32_t ty1 = (y1 * (int32_t)sy) / 100 + cursor_y;
-                        
-                        // Interpolate line
-                        int32_t dx = tx1 - tx0;
-                        int32_t dy = ty1 - ty0;
-                        
-                        // --- DRAWING SPEED / DENSITY CONTROL ---
-                        // The divisor controls how many points are generated per unit length.
-                        // Smaller divisor = More points = Slower drawing = Brighter lines = Less visible jumps
-                        // Larger divisor = Fewer points = Faster drawing = Dimmer lines = More visible jumps
-                        //
-                        // Recommended values:
-                        // 10-20: High quality, slow (good for simple shapes)
-                        // 40-80: Medium quality (good for text)
-                        // 100+: Fast (good for complex scenes, but lines may be dim)
-                        //
-                        // Current setting: / 5 (Very slow/dense to reduce jump lines)
-                        int steps = (int)sqrt((double)dx*dx + (double)dy*dy) / 5; 
-                        
-                        if(steps < 2) steps = 2; // At least start and end points
-                        
-                        for(int s=0; s<=steps; s++){
-                            if(DAC_Buff_Count >= DRAW_BUF_SIZE) break;
-                            DAC_Buff_X[DAC_Buff_Count] = tx0 + (dx * s) / steps;
-                            DAC_Buff_Y[DAC_Buff_Count] = ty0 + (dy * s) / steps;
-                            
-                            // Clip
-                            if(DAC_Buff_X[DAC_Buff_Count] > 4095) DAC_Buff_X[DAC_Buff_Count] = 4095;
-                            if(DAC_Buff_Y[DAC_Buff_Count] > 4095) DAC_Buff_Y[DAC_Buff_Count] = 4095;
-                            
-                            DAC_Buff_Count++;
+                        // Scale up for letters (Unit Length Mode -> DAC Mode)
+                        int32_t pre_scale = 1;
+                        if((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')){
+                            pre_scale = 512;
                         }
+                        
+                        minx *= pre_scale;
+                        maxx *= pre_scale;
+                        
+                        // Draw each line in the pattern
+                        for(int l=0; l<current_pattern_length; l++){
+                            int32_t x0 = current_pattern[l].x0 * pre_scale;
+                            int32_t y0 = current_pattern[l].y0 * pre_scale;
+                            int32_t x1 = current_pattern[l].x1 * pre_scale;
+                            int32_t y1 = current_pattern[l].y1 * pre_scale;
+                            
+                            // Transform
+                            int32_t tx0 = (x0 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100;
+                            int32_t ty0 = (y0 * (int32_t)sy) / 100 + cursor_y;
+                            int32_t tx1 = (x1 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100;
+                            int32_t ty1 = (y1 * (int32_t)sy) / 100 + cursor_y;
+                            
+                            // Interpolate line
+                            int32_t dx = tx1 - tx0;
+                            int32_t dy = ty1 - ty0;
+                            
+                            // --- DRAWING SPEED / DENSITY CONTROL ---
+                            int steps = (int)sqrt((double)dx*dx + (double)dy*dy) / 5; 
+                            
+                            if(steps < 2) steps = 2; // At least start and end points
+                            
+                            for(int s=0; s<=steps; s++){
+                                if(DAC_Buff_Count >= DRAW_BUF_SIZE) break;
+                                DAC_Buff_X[DAC_Buff_Count] = tx0 + (dx * s) / steps;
+                                DAC_Buff_Y[DAC_Buff_Count] = ty0 + (dy * s) / steps;
+                                
+                                // Clip
+                                if(DAC_Buff_X[DAC_Buff_Count] > 4095) DAC_Buff_X[DAC_Buff_Count] = 4095;
+                                if(DAC_Buff_Y[DAC_Buff_Count] > 4095) DAC_Buff_Y[DAC_Buff_Count] = 4095;
+                                
+                                DAC_Buff_Count++;
+                            }
+                        }
+                        
+                        // Advance cursor
+                        cursor_x += ((maxx - minx) * (int32_t)sx) / 100 + draw_pool[i].data.text_data.spacing;
                     }
+                }
+            }
+            else if(draw_pool[i].type == DRAW_TYPE_LINE)
+            {
+                int32_t x0 = draw_pool[i].data.line_data.x0;
+                int32_t y0 = draw_pool[i].data.line_data.y0;
+                int32_t x1 = draw_pool[i].data.line_data.x1;
+                int32_t y1 = draw_pool[i].data.line_data.y1;
+                
+                int32_t dx = x1 - x0;
+                int32_t dy = y1 - y0;
+                int steps = (int)sqrt((double)dx*dx + (double)dy*dy) / 5;
+                if(steps < 2) steps = 2;
+                
+                for(int s=0; s<=steps; s++){
+                    if(DAC_Buff_Count >= DRAW_BUF_SIZE) break;
+                    DAC_Buff_X[DAC_Buff_Count] = x0 + (dx * s) / steps;
+                    DAC_Buff_Y[DAC_Buff_Count] = y0 + (dy * s) / steps;
+                    if(DAC_Buff_X[DAC_Buff_Count] > 4095) DAC_Buff_X[DAC_Buff_Count] = 4095;
+                    if(DAC_Buff_Y[DAC_Buff_Count] > 4095) DAC_Buff_Y[DAC_Buff_Count] = 4095;
+                    DAC_Buff_Count++;
+                }
+            }
+            else if(draw_pool[i].type == DRAW_TYPE_RECT)
+            {
+                int32_t x = draw_pool[i].data.rect_data.x;
+                int32_t y = draw_pool[i].data.rect_data.y;
+                int32_t w = draw_pool[i].data.rect_data.w;
+                int32_t h = draw_pool[i].data.rect_data.h;
+                
+                // 4 Lines
+                int32_t pts[5][2] = { {x,y}, {x+w,y}, {x+w,y+h}, {x,y+h}, {x,y} };
+                
+                for(int l=0; l<4; l++){
+                    int32_t x0 = pts[l][0];
+                    int32_t y0 = pts[l][1];
+                    int32_t x1 = pts[l+1][0];
+                    int32_t y1 = pts[l+1][1];
                     
-                    // Advance cursor
-                    cursor_x += ((maxx - minx) * (int32_t)sx) / 100 + draw_pool[i].spacing;
+                    int32_t dx = x1 - x0;
+                    int32_t dy = y1 - y0;
+                    int steps = (int)sqrt((double)dx*dx + (double)dy*dy) / 5;
+                    if(steps < 2) steps = 2;
+                    
+                    for(int s=0; s<=steps; s++){
+                        if(DAC_Buff_Count >= DRAW_BUF_SIZE) break;
+                        DAC_Buff_X[DAC_Buff_Count] = x0 + (dx * s) / steps;
+                        DAC_Buff_Y[DAC_Buff_Count] = y0 + (dy * s) / steps;
+                        if(DAC_Buff_X[DAC_Buff_Count] > 4095) DAC_Buff_X[DAC_Buff_Count] = 4095;
+                        if(DAC_Buff_Y[DAC_Buff_Count] > 4095) DAC_Buff_Y[DAC_Buff_Count] = 4095;
+                        DAC_Buff_Count++;
+                    }
+                }
+            }
+            else if(draw_pool[i].type == DRAW_TYPE_CIRCLE)
+            {
+                int32_t cx = draw_pool[i].data.circle_data.x;
+                int32_t cy = draw_pool[i].data.circle_data.y;
+                int32_t r = draw_pool[i].data.circle_data.r;
+                
+                // Circumference approx 2*pi*r
+                int steps = (int)(6.28 * r) / 5;
+                if(steps < 10) steps = 10;
+                
+                for(int s=0; s<=steps; s++){
+                    if(DAC_Buff_Count >= DRAW_BUF_SIZE) break;
+                    double angle = (double)s / steps * 6.283185307;
+                    DAC_Buff_X[DAC_Buff_Count] = cx + (int32_t)(cos(angle) * r);
+                    DAC_Buff_Y[DAC_Buff_Count] = cy + (int32_t)(sin(angle) * r);
+                    if(DAC_Buff_X[DAC_Buff_Count] > 4095) DAC_Buff_X[DAC_Buff_Count] = 4095;
+                    if(DAC_Buff_Y[DAC_Buff_Count] > 4095) DAC_Buff_Y[DAC_Buff_Count] = 4095;
+                    DAC_Buff_Count++;
                 }
             }
         }
@@ -413,18 +492,72 @@ uint8_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y, ui
   }
   if(slot < 0) return 0;
 
-  strncpy(draw_pool[slot].text, s, MAX_STR_LEN-1);
-  draw_pool[slot].text[MAX_STR_LEN-1] = '\0';
-  draw_pool[slot].x = x;
-  draw_pool[slot].y = y;
-  draw_pool[slot].sx = sx;
-  draw_pool[slot].sy = sy;
-  draw_pool[slot].spacing = spacing;
+  draw_pool[slot].type = DRAW_TYPE_TEXT;
+  strncpy(draw_pool[slot].data.text_data.text, s, MAX_STR_LEN-1);
+  draw_pool[slot].data.text_data.text[MAX_STR_LEN-1] = '\0';
+  draw_pool[slot].data.text_data.x = x;
+  draw_pool[slot].data.text_data.y = y;
+  draw_pool[slot].data.text_data.sx = sx;
+  draw_pool[slot].data.text_data.sy = sy;
+  draw_pool[slot].data.text_data.spacing = spacing;
   draw_pool[slot].active = 1;
   
   // Update buffer immediately
   DRAW_Render();
   
+  return 1;
+}
+
+uint8_t DRAW_AddLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1){
+  int slot = -1;
+  for(int i=0; i<MAX_DRAW_OBJS; i++){
+    if(!draw_pool[i].active){ slot = i; break; }
+  }
+  if(slot < 0) return 0;
+
+  draw_pool[slot].type = DRAW_TYPE_LINE;
+  draw_pool[slot].data.line_data.x0 = x0;
+  draw_pool[slot].data.line_data.y0 = y0;
+  draw_pool[slot].data.line_data.x1 = x1;
+  draw_pool[slot].data.line_data.y1 = y1;
+  draw_pool[slot].active = 1;
+  
+  DRAW_Render();
+  return 1;
+}
+
+uint8_t DRAW_AddRect(int32_t x, int32_t y, int32_t w, int32_t h){
+  int slot = -1;
+  for(int i=0; i<MAX_DRAW_OBJS; i++){
+    if(!draw_pool[i].active){ slot = i; break; }
+  }
+  if(slot < 0) return 0;
+
+  draw_pool[slot].type = DRAW_TYPE_RECT;
+  draw_pool[slot].data.rect_data.x = x;
+  draw_pool[slot].data.rect_data.y = y;
+  draw_pool[slot].data.rect_data.w = w;
+  draw_pool[slot].data.rect_data.h = h;
+  draw_pool[slot].active = 1;
+  
+  DRAW_Render();
+  return 1;
+}
+
+uint8_t DRAW_AddCircle(int32_t x, int32_t y, int32_t r){
+  int slot = -1;
+  for(int i=0; i<MAX_DRAW_OBJS; i++){
+    if(!draw_pool[i].active){ slot = i; break; }
+  }
+  if(slot < 0) return 0;
+
+  draw_pool[slot].type = DRAW_TYPE_CIRCLE;
+  draw_pool[slot].data.circle_data.x = x;
+  draw_pool[slot].data.circle_data.y = y;
+  draw_pool[slot].data.circle_data.r = r;
+  draw_pool[slot].active = 1;
+  
+  DRAW_Render();
   return 1;
 }
 
@@ -434,12 +567,12 @@ void DRAW_SetLetter(char c){
     DRAW_AddString(buf, 0, offset_x, offset_y, scale_x_pct, scale_y_pct);
 }
 
-void DRAW_Terminal_Init(uint16_t scale_pct){
+void DRAW_Terminal_Init(uint16_t scale_pct, int32_t spacing){
     if(scale_pct < 1) scale_pct = 1;
     DRAW_Clear();
     term_scale = scale_pct;
     
-    term_char_spacing = (500 * (int32_t)scale_pct) / 100; // spacing
+    term_char_spacing = spacing;
     
     // Estimate line height: 4096 (full height) * scale / 100.
     // A char is roughly 4096 units high in pattern space.
@@ -462,16 +595,21 @@ void DRAW_Terminal_Init(uint16_t scale_pct){
     term_cursor_x = 0;
 }
 
+void DRAW_Terminal_SetSpacing(int32_t spacing){
+    term_char_spacing = spacing;
+}
+
 void DRAW_Terminal_Print(const char *str){
     // If no active line, start one
     if(term_current_line == 0 && !draw_pool[0].active){
         draw_pool[0].active = 1;
-        draw_pool[0].x = 0;
-        draw_pool[0].y = term_cursor_y;
-        draw_pool[0].sx = term_scale;
-        draw_pool[0].sy = term_scale;
-        draw_pool[0].spacing = term_char_spacing;
-        draw_pool[0].text[0] = '\0';
+        draw_pool[0].type = DRAW_TYPE_TEXT;
+        draw_pool[0].data.text_data.x = 0;
+        draw_pool[0].data.text_data.y = term_cursor_y;
+        draw_pool[0].data.text_data.sx = term_scale;
+        draw_pool[0].data.text_data.sy = term_scale;
+        draw_pool[0].data.text_data.spacing = term_char_spacing;
+        draw_pool[0].data.text_data.text[0] = '\0';
     }
 
     int len = strlen(str);
@@ -485,27 +623,28 @@ void DRAW_Terminal_Print(const char *str){
             if(term_current_line >= term_max_lines){
                 // Scroll up
                 for(int j=0; j<term_max_lines-1; j++){
-                    strcpy(draw_pool[j].text, draw_pool[j+1].text);
-                    // Ensure active status is propagated (though usually all are active when scrolling)
-                    draw_pool[j].active = draw_pool[j+1].active;
-                    // Coordinates are fixed per slot, so we don't copy them.
-                    // Slot 0 is always top line, Slot 1 is second line...
-                    // But wait, we need to ensure slot 0 is active if slot 1 was active.
+                    // Only copy text data if it's text type
+                    if(draw_pool[j+1].type == DRAW_TYPE_TEXT){
+                        draw_pool[j].type = DRAW_TYPE_TEXT;
+                        strcpy(draw_pool[j].data.text_data.text, draw_pool[j+1].data.text_data.text);
+                        draw_pool[j].active = draw_pool[j+1].active;
+                    }
                 }
                 // Clear last line
-                draw_pool[term_max_lines-1].text[0] = '\0';
+                draw_pool[term_max_lines-1].data.text_data.text[0] = '\0';
                 term_current_line = term_max_lines - 1;
             }
             
             // Setup new line
             draw_pool[term_current_line].active = 1;
-            draw_pool[term_current_line].x = 0;
+            draw_pool[term_current_line].type = DRAW_TYPE_TEXT;
+            draw_pool[term_current_line].data.text_data.x = 0;
             // Calculate Y for this slot
-            draw_pool[term_current_line].y = 4096 - (term_current_line + 1) * term_line_height;
-            draw_pool[term_current_line].sx = term_scale;
-            draw_pool[term_current_line].sy = term_scale;
-            draw_pool[term_current_line].spacing = term_char_spacing;
-            draw_pool[term_current_line].text[0] = '\0';
+            draw_pool[term_current_line].data.text_data.y = 4096 - (term_current_line + 1) * term_line_height;
+            draw_pool[term_current_line].data.text_data.sx = term_scale;
+            draw_pool[term_current_line].data.text_data.sy = term_scale;
+            draw_pool[term_current_line].data.text_data.spacing = term_char_spacing;
+            draw_pool[term_current_line].data.text_data.text[0] = '\0';
             
             term_cursor_x = 0;
             continue;
@@ -516,32 +655,34 @@ void DRAW_Terminal_Print(const char *str){
         int32_t char_w = (2000 * (int32_t)term_scale) / 100 + term_char_spacing;
         if(term_cursor_x + char_w > 4096){
              // Auto wrap
-             // Recursive call with newline? Or just duplicate logic
-             // Let's just trigger newline logic
              term_current_line++;
              if(term_current_line >= term_max_lines){
                 for(int j=0; j<term_max_lines-1; j++){
-                    strcpy(draw_pool[j].text, draw_pool[j+1].text);
-                    draw_pool[j].active = draw_pool[j+1].active;
+                    if(draw_pool[j+1].type == DRAW_TYPE_TEXT){
+                        draw_pool[j].type = DRAW_TYPE_TEXT;
+                        strcpy(draw_pool[j].data.text_data.text, draw_pool[j+1].data.text_data.text);
+                        draw_pool[j].active = draw_pool[j+1].active;
+                    }
                 }
-                draw_pool[term_max_lines-1].text[0] = '\0';
+                draw_pool[term_max_lines-1].data.text_data.text[0] = '\0';
                 term_current_line = term_max_lines - 1;
              }
              draw_pool[term_current_line].active = 1;
-             draw_pool[term_current_line].x = 0;
-             draw_pool[term_current_line].y = 4096 - (term_current_line + 1) * term_line_height;
-             draw_pool[term_current_line].sx = term_scale;
-             draw_pool[term_current_line].sy = term_scale;
-             draw_pool[term_current_line].spacing = term_char_spacing;
-             draw_pool[term_current_line].text[0] = '\0';
+             draw_pool[term_current_line].type = DRAW_TYPE_TEXT;
+             draw_pool[term_current_line].data.text_data.x = 0;
+             draw_pool[term_current_line].data.text_data.y = 4096 - (term_current_line + 1) * term_line_height;
+             draw_pool[term_current_line].data.text_data.sx = term_scale;
+             draw_pool[term_current_line].data.text_data.sy = term_scale;
+             draw_pool[term_current_line].data.text_data.spacing = term_char_spacing;
+             draw_pool[term_current_line].data.text_data.text[0] = '\0';
              term_cursor_x = 0;
         }
         
         // Append char
-        int cur_len = strlen(draw_pool[term_current_line].text);
+        int cur_len = strlen(draw_pool[term_current_line].data.text_data.text);
         if(cur_len < MAX_STR_LEN - 1){
-            draw_pool[term_current_line].text[cur_len] = c;
-            draw_pool[term_current_line].text[cur_len+1] = '\0';
+            draw_pool[term_current_line].data.text_data.text[cur_len] = c;
+            draw_pool[term_current_line].data.text_data.text[cur_len+1] = '\0';
             term_cursor_x += char_w;
         }
     }

@@ -68,3 +68,4 @@ edc_407\freertos.o: ../Core/Inc/dac.h
 edc_407\freertos.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 edc_407\freertos.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 edc_407\freertos.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+edc_407\freertos.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h

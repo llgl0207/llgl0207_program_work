@@ -69,7 +69,7 @@ static int count_S=0;
 uint8_t percentage=5;
 
 // --- SD Waveform Variables ---
-#define SD_WAVE_MAX_LEN 32768 // 32KB Buffer
+#define SD_WAVE_MAX_LEN 16384 // 16KB Buffer
 uint8_t SD_Wave_Buffer[SD_WAVE_MAX_LEN]; // Buffer to store raw audio data
 uint32_t SD_Wave_Len = 0;                // Actual length of loaded data
 volatile uint32_t SD_Wave_Idx = 0;       // Current playback position (Read Head) - Modified by ISR
@@ -171,8 +171,8 @@ int main(void)
   DRAW_Init(1000); 
   HAL_TIM_Base_Start(&htim6);  // Start TIM6 for DAC DMA trigger
   
-  // Initialize Terminal Mode (Scale 12%)
-  DRAW_Terminal_Init(12);
+  // Initialize Terminal Mode (Scale 12%, Spacing 100)
+  DRAW_Terminal_Init(12, 100);
   DRAW_Terminal_Print("SYSTEM BOOT...\n");
 	
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);

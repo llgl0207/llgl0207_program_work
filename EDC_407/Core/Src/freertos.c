@@ -22,26 +22,30 @@
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
 #include "fatfs.h"
 #include "draw.h"
 #include "tim.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
+#include <stdlib.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef enum {
+    UI_MENU_MAIN,
+    UI_MENU_MUSIC_LIST,
+    UI_PLAYING
+} UI_State;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SD_WAVE_MAX_LEN 32768
+#define SD_WAVE_MAX_LEN 16384
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -66,6 +70,13 @@ extern int scale;
 extern uint8_t func;
 extern uint8_t Music_Score[];
 extern uint8_t Wave[];
+
+// Music Player Globals
+#define MAX_MUSIC_FILES 20
+#define MAX_FILENAME_LEN 32
+char music_files[MAX_MUSIC_FILES][MAX_FILENAME_LEN];
+int music_file_count = 0;
+char current_playing_file[MAX_FILENAME_LEN];
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId myTask02Handle;
@@ -73,7 +84,9 @@ osThreadId myTask03Handle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-
+void Scan_Music_Files(void);
+void Play_Music(char* filename);
+void Stop_Music(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void const * argument);
@@ -126,7 +139,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 1024);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of myTask02 */
@@ -134,7 +147,7 @@ void MX_FREERTOS_Init(void) {
   myTask02Handle = osThreadCreate(osThread(myTask02), NULL);
 
   /* definition and creation of myTask03 */
-  osThreadDef(myTask03, GuiTask, osPriorityNormal, 0, 512);
+  osThreadDef(myTask03, GuiTask, osPriorityNormal, 0, 1024);
   myTask03Handle = osThreadCreate(osThread(myTask03), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -319,54 +332,256 @@ void AudioTask(void const * argument)
 void GuiTask(void const * argument)
 {
   /* USER CODE BEGIN GuiTask */
-  static uint32_t last_print = 0;
-  static int alpha_idx = 0;
-  const char alpha_map[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  
+  UI_State ui_state = UI_MENU_MAIN;
+  
+  // Main Menu Items
+  const char *main_menu_items[] = {
+      "Music Player",
+      "Oscilloscope",
+      "Settings",
+      "About",
+      "Exit"
+  };
+  const int main_menu_count = 5;
+  
+  // State Variables
+  int menu_index = 0;
+  int menu_scroll = 0;
+  int last_menu_index = -1;
+  int last_menu_scroll = -1;
+  
+  // Scrolling Text Variables
+  uint32_t last_scroll_time = 0;
+  int text_scroll_offset = 0;
+  
+  // UI Constants
+  const int line_height = 500;
+  const int start_y = 3500;
+  const int visible_lines = 6;
+  
+  DRAW_Clear();
+  
+  static uint16_t last_encoder = 0;
+  static int32_t encoder_acc = 0;
   
   /* Infinite loop */
   for(;;)
   {
     HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
     
-    // --- Alphabet Test ---
-    if(HAL_GetTick() - last_print > 500)
-    {
-         last_print = HAL_GetTick();
-         char s[2] = {0};
-         s[0] = alpha_map[alpha_idx];
-         DRAW_Terminal_Print(s);
-         
-         alpha_idx++;
-         if(alpha_map[alpha_idx] == '\0') alpha_idx = 0;
-    }
-    
     // Encoder Logic
-    static uint16_t last_encoder=0;
     uint16_t encoder = __HAL_TIM_GET_COUNTER(&htim8);
-    int delta = encoder - last_encoder;
-    if(delta > 1000 || delta < -1000) delta = 0;
+    int16_t delta = (int16_t)(encoder - last_encoder);
     last_encoder = encoder;
     
-    if(func==0){ volume += delta/4; }
-    if(func==1){ pitch += delta/4; scale = pitch; }
+    // Handle Volume in Playing State
+    if(ui_state == UI_PLAYING) {
+        if(delta != 0) {
+             volume += delta; // Adjust volume directly
+             // Clamp volume? Assuming uint16_t wraps or is handled elsewhere
+             // Let's clamp to 0-100 for safety if it was percentage, but here it seems to be raw amplitude scaler?
+             // Previous code: volume += delta/4. Let's keep it simple.
+        }
+    } else {
+        // Menu Navigation
+        encoder_acc += delta;
+        if(abs(encoder_acc) >= 4) {
+            int steps = encoder_acc / 4;
+            menu_index += steps;
+            encoder_acc -= steps * 4;
+            
+            int max_items = (ui_state == UI_MENU_MAIN) ? main_menu_count : music_file_count;
+            
+            if(menu_index < 0) menu_index = 0;
+            if(menu_index >= max_items) menu_index = max_items - 1;
+        }
+    }
     
-    // Music Logic (Legacy)
-    if(!SD_Wave_Loaded)
-    {
-        // Simple fallback music logic
-        // Note: We don't have the full music logic here, just a placeholder
-        // to avoid compilation errors if we try to use Music_Score
-        osDelay(100);
+    // Button Logic (RS_Pin)
+    if(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) {
+        osDelay(50); // Debounce
+        if(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) {
+             while(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) osDelay(10);
+             
+             if(ui_state == UI_MENU_MAIN) {
+                 if(menu_index == 0) { // Music Player
+                     Scan_Music_Files();
+                     ui_state = UI_MENU_MUSIC_LIST;
+                     menu_index = 0;
+                     menu_scroll = 0;
+                     last_menu_index = -1; // Force redraw
+                 }
+             } else if(ui_state == UI_MENU_MUSIC_LIST) {
+                 if(menu_index == 0) { // Back ".."
+                     ui_state = UI_MENU_MAIN;
+                     menu_index = 0;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
+                 } else {
+                     // Play File
+                     strncpy(current_playing_file, music_files[menu_index], MAX_FILENAME_LEN);
+                     Play_Music(current_playing_file);
+                     ui_state = UI_PLAYING;
+                     last_menu_index = -1;
+                 }
+             } else if(ui_state == UI_PLAYING) {
+                 Stop_Music();
+                 ui_state = UI_MENU_MUSIC_LIST;
+                 last_menu_index = -1;
+             }
+        }
     }
-    else
-    {
-        osDelay(100);
+    
+    // Scrolling Text Logic
+    if(HAL_GetTick() - last_scroll_time > 300) {
+        last_scroll_time = HAL_GetTick();
+        text_scroll_offset++;
+        // Reset if too long? Handled in render
+        last_menu_index = -1; // Force redraw to update scroll
     }
+    
+    // Render UI
+    if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING) {
+        // Only clear if structure changes, but for now clear always for simplicity
+        DRAW_Clear();
+        
+        if(ui_state == UI_PLAYING) {
+            DRAW_AddString("PLAYING:", 100, 100, 3500, 15, 15);
+            DRAW_AddString(current_playing_file, 100, 100, 3000, 15, 15);
+            
+            char vol_str[16];
+            sprintf(vol_str, "VOL: %d", volume);
+            DRAW_AddString(vol_str, 100, 100, 2000, 15, 15);
+            
+            DRAW_AddString("[PRESS TO STOP]", 100, 100, 1000, 10, 10);
+        } else {
+            // Menu Rendering
+            int count = (ui_state == UI_MENU_MAIN) ? main_menu_count : music_file_count;
+            
+            // Calculate Scroll
+            if(menu_index < menu_scroll) menu_scroll = menu_index;
+            if(menu_index >= menu_scroll + visible_lines) menu_scroll = menu_index - visible_lines + 1;
+            
+            for(int i=0; i<visible_lines; i++) {
+                int item_idx = menu_scroll + i;
+                if(item_idx >= count) break;
+                
+                int y_pos = start_y - (i * line_height);
+                
+                // Draw Cursor
+                if(item_idx == menu_index) {
+                    DRAW_AddString(">", 100, 100, y_pos, 15, 15);
+                    
+                    // Scrolling Text
+                    const char *text = (ui_state == UI_MENU_MAIN) ? main_menu_items[item_idx] : music_files[item_idx];
+                    int len = strlen(text);
+                    char display_text[32];
+                    
+                    if(len > 15) {
+                        int offset = text_scroll_offset % (len + 5); // +5 for pause space
+                        for(int k=0; k<15; k++) {
+                            int char_idx = (offset + k) % (len + 5);
+                            if(char_idx < len) display_text[k] = text[char_idx];
+                            else display_text[k] = ' ';
+                        }
+                        display_text[15] = '\0';
+                        DRAW_AddString(display_text, 100, 400, y_pos, 15, 15);
+                    } else {
+                        DRAW_AddString(text, 100, 400, y_pos, 15, 15);
+                    }
+                } else {
+                    // Normal Text
+                    const char *text = (ui_state == UI_MENU_MAIN) ? main_menu_items[item_idx] : music_files[item_idx];
+                    DRAW_AddString(text, 100, 400, y_pos, 15, 15);
+                }
+            }
+        }
+        
+        DRAW_AddRect(0, 0, 4095, 4095);
+        
+        last_menu_index = menu_index;
+        last_menu_scroll = menu_scroll;
+    }
+    
+    osDelay(50);
   }
   /* USER CODE END GuiTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+void Scan_Music_Files(void) {
+    DIR dir;
+    FILINFO fno;
+    FRESULT res;
+    
+    // Clear file list
+    memset(music_files, 0, sizeof(music_files));
+    music_file_count = 0;
+    
+    // Add "Back" option
+    strcpy(music_files[0], "Back");
+    music_file_count++;
+    
+    res = f_opendir(&dir, "/music");
+    if (res == FR_OK) {
+        for (;;) {
+            res = f_readdir(&dir, &fno);
+            if (res != FR_OK || fno.fname[0] == 0) break;
+            if (fno.fattrib & AM_DIR) continue;
+            
+            // Check extension .wav
+            if (strstr(fno.fname, ".wav") || strstr(fno.fname, ".WAV")) {
+                if (music_file_count < MAX_MUSIC_FILES) {
+                    strncpy(music_files[music_file_count], fno.fname, MAX_FILENAME_LEN - 1);
+                    music_files[music_file_count][MAX_FILENAME_LEN - 1] = '\0';
+                    music_file_count++;
+                }
+            }
+        }
+        f_closedir(&dir);
+    }
+}
 
+void Play_Music(char* filename) {
+    Stop_Music();
+    
+    char path[64];
+    sprintf(path, "/music/%s", filename);
+    
+    FRESULT res = f_open(&fil, path, FA_READ);
+    if(res == FR_OK) {
+        UINT br;
+        uint8_t header[44];
+        f_read(&fil, header, 44, &br);
+        
+        if(strncmp((char*)header, "RIFF", 4) == 0 && strncmp((char*)&header[8], "WAVE", 4) == 0) {
+             uint32_t data_size = header[40] | (header[41] << 8) | (header[42] << 16) | (header[43] << 24);
+             SD_Wave_Total_Data_Left = data_size;
+             
+             uint32_t to_read = (data_size > SD_WAVE_MAX_LEN) ? SD_WAVE_MAX_LEN : data_size;
+             f_read(&fil, SD_Wave_Buffer, to_read, &br);
+             
+             SD_Wave_Idx = 0;
+             SD_Wave_Write_Idx = (br < SD_WAVE_MAX_LEN) ? br : 0;
+             SD_Wave_Total_Data_Left -= br;
+             
+             SD_Wave_Loaded = 1;
+             
+             // Set Frequency (Assuming 44.1kHz for now)
+             __HAL_TIM_SET_PRESCALER(&htim3, 0);
+             __HAL_TIM_SET_AUTORELOAD(&htim3, 1904);
+             __HAL_TIM_SET_COUNTER(&htim3, 0);
+        } else {
+            f_close(&fil);
+        }
+    }
+}
+
+void Stop_Music(void) {
+    SD_Wave_Loaded = 0;
+    osDelay(10); // Wait for AudioTask to pause
+    f_close(&fil);
+}
 /* USER CODE END Application */
