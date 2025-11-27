@@ -531,9 +531,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 int16_t y_sample = (int16_t)(SD_Wave_Buffer[SD_Wave_Idx+6] | (SD_Wave_Buffer[SD_Wave_Idx+7] << 8));
                 
                 // Output
-                // Audio: Convert signed 16-bit to unsigned PWM (0-4095)
-                // (sample + 32768) >> 4
-                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 4);
+                // Audio: Convert signed 16-bit to unsigned PWM (0-511)
+                // (sample + 32768) >> 7
+                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 7);
                 __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, pwm_val * volume / 100);
                 
                 // DAC: 12-bit (0-4095)
@@ -560,8 +560,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 
                 int16_t audio_sample = (int16_t)(SD_Wave_Buffer[SD_Wave_Idx] | (SD_Wave_Buffer[SD_Wave_Idx+1] << 8));
                 
-                // Convert signed 16-bit to 12-bit PWM (0-4095)
-                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 4);
+                // Convert signed 16-bit to 9-bit PWM (0-511)
+                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 7);
                 __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, pwm_val * volume / 100);
                 
                 SD_Wave_Idx += 2;
