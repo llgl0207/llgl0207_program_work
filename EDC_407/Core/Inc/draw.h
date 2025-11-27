@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 // Buffer size for DMA (adjust based on RAM availability and complexity)
-// Reduced to 4096 to save RAM (8KB x 2 buffers = 16KB)
+// Increased to 16384 to support more text (requires ~64KB RAM)
 #define DRAW_BUF_SIZE 16384
 
 // Shape Types

@@ -45,7 +45,7 @@ typedef enum {
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SD_WAVE_MAX_LEN 16384
+#define SD_WAVE_MAX_LEN 32768
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -58,11 +58,12 @@ typedef enum {
 extern FIL fil;
 extern FATFS fs;
 extern SD_HandleTypeDef hsd;
-extern uint8_t SD_Wave_Buffer[];
+extern uint8_t *SD_Wave_Buffer; // Changed to pointer
 extern volatile uint32_t SD_Wave_Idx;
 extern volatile uint32_t SD_Wave_Write_Idx;
 extern uint8_t SD_Wave_Loaded;
 extern uint32_t SD_Wave_Total_Data_Left;
+extern uint8_t Video_Mode;
 
 extern uint16_t volume;
 extern uint8_t pitch;
@@ -84,8 +85,9 @@ osThreadId myTask03Handle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void Scan_Music_Files(void);
+void Scan_Music_Files(const char* path);
 void Play_Music(char* filename);
+void Play_Video(char* filename);
 void Stop_Music(void);
 /* USER CODE END FunctionPrototypes */
 
@@ -338,7 +340,7 @@ void GuiTask(void const * argument)
   // Main Menu Items
   const char *main_menu_items[] = {
       "Music Player",
-      "Oscilloscope",
+      "Video Player",
       "Settings",
       "About",
       "Exit"
@@ -350,6 +352,7 @@ void GuiTask(void const * argument)
   int menu_scroll = 0;
   int last_menu_index = -1;
   int last_menu_scroll = -1;
+  int menu_mode = 0; // 0: Music, 1: Video
   
   // Scrolling Text Variables
   uint32_t last_scroll_time = 0;
@@ -406,14 +409,22 @@ void GuiTask(void const * argument)
              
              if(ui_state == UI_MENU_MAIN) {
                  if(menu_index == 0) { // Music Player
-                     Scan_Music_Files();
+                     Scan_Music_Files("/music");
                      ui_state = UI_MENU_MUSIC_LIST;
+                     menu_mode = 0;
                      menu_index = 0;
                      menu_scroll = 0;
                      last_menu_index = -1; // Force redraw
+                 } else if(menu_index == 1) { // Video Player
+                     Scan_Music_Files("/video");
+                     ui_state = UI_MENU_MUSIC_LIST;
+                     menu_mode = 1;
+                     menu_index = 0;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
                  }
              } else if(ui_state == UI_MENU_MUSIC_LIST) {
-                 if(menu_index == 0) { // Back ".."
+                 if(menu_index == 0) { // Back "Back"
                      ui_state = UI_MENU_MAIN;
                      menu_index = 0;
                      menu_scroll = 0;
@@ -421,7 +432,8 @@ void GuiTask(void const * argument)
                  } else {
                      // Play File
                      strncpy(current_playing_file, music_files[menu_index], MAX_FILENAME_LEN);
-                     Play_Music(current_playing_file);
+                     if(menu_mode == 0) Play_Music(current_playing_file);
+                     else Play_Video(current_playing_file);
                      ui_state = UI_PLAYING;
                      last_menu_index = -1;
                  }
@@ -442,7 +454,7 @@ void GuiTask(void const * argument)
     }
     
     // Render UI
-    if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING) {
+    if((menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING) && !(ui_state == UI_PLAYING && menu_mode == 1)) {
         // Only clear if structure changes, but for now clear always for simplicity
         DRAW_Clear();
         
@@ -511,7 +523,7 @@ void GuiTask(void const * argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-void Scan_Music_Files(void) {
+void Scan_Music_Files(const char* path) {
     DIR dir;
     FILINFO fno;
     FRESULT res;
@@ -524,7 +536,7 @@ void Scan_Music_Files(void) {
     strcpy(music_files[0], "Back");
     music_file_count++;
     
-    res = f_opendir(&dir, "/music");
+    res = f_opendir(&dir, path);
     if (res == FR_OK) {
         for (;;) {
             res = f_readdir(&dir, &fno);
@@ -579,9 +591,90 @@ void Play_Music(char* filename) {
     }
 }
 
+void Play_Video(char* filename) {
+    Stop_Music();
+    
+    char path[64];
+    sprintf(path, "/video/%s", filename);
+    
+    FRESULT res = f_open(&fil, path, FA_READ);
+    if(res == FR_OK) {
+        UINT br;
+        uint8_t header[44];
+        f_read(&fil, header, 44, &br);
+        
+        if(strncmp((char*)header, "RIFF", 4) == 0 && strncmp((char*)&header[8], "WAVE", 4) == 0) {
+             uint32_t data_size = header[40] | (header[41] << 8) | (header[42] << 16) | (header[43] << 24);
+             SD_Wave_Total_Data_Left = data_size;
+             
+             uint32_t to_read = (data_size > SD_WAVE_MAX_LEN) ? SD_WAVE_MAX_LEN : data_size;
+             f_read(&fil, SD_Wave_Buffer, to_read, &br);
+             
+             SD_Wave_Idx = 0;
+             SD_Wave_Write_Idx = (br < SD_WAVE_MAX_LEN) ? br : 0;
+             SD_Wave_Total_Data_Left -= br;
+             
+             SD_Wave_Loaded = 1;
+             Video_Mode = 1;
+             
+             // --- Configure DAC for Immediate Output (No Trigger) ---
+             extern DAC_HandleTypeDef hdac;
+             HAL_DAC_Stop_DMA(&hdac, DAC_CHANNEL_1);
+             HAL_DAC_Stop_DMA(&hdac, DAC_CHANNEL_2);
+             HAL_DAC_Stop(&hdac, DAC_CHANNEL_1);
+             HAL_DAC_Stop(&hdac, DAC_CHANNEL_2);
+             
+             DAC_ChannelConfTypeDef sConfig = {0};
+             sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
+             sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_DISABLE;
+             
+             if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK) {
+                 DRAW_Terminal_Print("DAC1 CFG ERR\n");
+             }
+             if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_2) != HAL_OK) {
+                 DRAW_Terminal_Print("DAC2 CFG ERR\n");
+             }
+             
+             HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+             HAL_DAC_Start(&hdac, DAC_CHANNEL_2);
+             
+             // Center Beam Initially
+             HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2048);
+             HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 2048);
+             // -----------------------------------------------------
+             
+             // Set Frequency (Assuming 44.1kHz for now)
+             __HAL_TIM_SET_PRESCALER(&htim3, 0);
+             __HAL_TIM_SET_AUTORELOAD(&htim3, 1904);
+             __HAL_TIM_SET_COUNTER(&htim3, 0);
+        } else {
+            f_close(&fil);
+        }
+    }
+}
+
 void Stop_Music(void) {
     SD_Wave_Loaded = 0;
+    
+    if(Video_Mode) {
+        // --- Restore DAC for Drawing (Timer 6 Trigger) ---
+        extern DAC_HandleTypeDef hdac;
+        HAL_DAC_Stop(&hdac, DAC_CHANNEL_1);
+        HAL_DAC_Stop(&hdac, DAC_CHANNEL_2);
+        
+        DAC_ChannelConfTypeDef sConfig = {0};
+        sConfig.DAC_Trigger = DAC_TRIGGER_T6_TRGO;
+        sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_DISABLE;
+        
+        HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1);
+        HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_2);
+        // DMA will be restarted by GuiTask -> DRAW_Render
+        // -------------------------------------------------
+    }
+    
+    Video_Mode = 0;
     osDelay(10); // Wait for AudioTask to pause
     f_close(&fil);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
 }
 /* USER CODE END Application */

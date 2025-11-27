@@ -69,13 +69,16 @@ static int count_S=0;
 uint8_t percentage=5;
 
 // --- SD Waveform Variables ---
-#define SD_WAVE_MAX_LEN 16384 // 16KB Buffer
-uint8_t SD_Wave_Buffer[SD_WAVE_MAX_LEN]; // Buffer to store raw audio data
+#define SD_WAVE_MAX_LEN 32768 // 32KB Buffer (Mapped to DAC_Buff_X)
+uint8_t *SD_Wave_Buffer; // Pointer to store raw audio data (Points to DAC_Buff_X)
 uint32_t SD_Wave_Len = 0;                // Actual length of loaded data
 volatile uint32_t SD_Wave_Idx = 0;       // Current playback position (Read Head) - Modified by ISR
 volatile uint32_t SD_Wave_Write_Idx = 0; // Current write position (Write Head)
 uint32_t SD_Wave_Total_Data_Left = 0;    // Bytes remaining in file
 uint8_t SD_Wave_Loaded = 0;              // Flag: 1 if playing, 0 otherwise
+uint8_t Video_Mode = 0;                  // 0: Audio Only, 1: Video (4-Channel)
+
+extern uint16_t DAC_Buff_X[]; // Defined in draw.c
 // -----------------------------
 
 // --- FatFS Variables (Moved to Global to avoid Stack Overflow) ---
@@ -167,6 +170,7 @@ int main(void)
   MX_FATFS_Init();
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
+  SD_Wave_Buffer = (uint8_t*)DAC_Buff_X; // Initialize pointer
   /* 初始化绘图库 */
   DRAW_Init(1000); 
   HAL_TIM_Base_Start(&htim6);  // Start TIM6 for DAC DMA trigger
@@ -175,6 +179,7 @@ int main(void)
   DRAW_Terminal_Init(12, 100);
   DRAW_Terminal_Print("SYSTEM BOOT...\n");
 	
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0); // Ensure PWM is 0 at startup
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_TIM_Encoder_Start(&htim8, TIM_CHANNEL_ALL);
@@ -506,11 +511,61 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         // --- SD Waveform Playback ---
         if(SD_Wave_Loaded)
         {
-            SD_Wave_Idx++;
-            if(SD_Wave_Idx >= SD_WAVE_MAX_LEN) SD_Wave_Idx = 0; // Wrap Buffer
-            
-            // Output sample from SD buffer
-            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, SD_Wave_Buffer[SD_Wave_Idx] * volume / 100);
+            if(Video_Mode)
+            {
+                // 4-Channel Mode: [L, R, X, Y] (16-bit each)
+                // Buffer is uint8_t* pointing to uint16_t array.
+                // We need to read 4 samples (8 bytes).
+                
+                // Check bounds
+                if(SD_Wave_Idx + 8 > SD_WAVE_MAX_LEN) SD_Wave_Idx = 0;
+                
+                // Audio (Channel 1) -> TIM2 CH3
+                // Data is Little Endian.
+                int16_t audio_sample = (int16_t)(SD_Wave_Buffer[SD_Wave_Idx] | (SD_Wave_Buffer[SD_Wave_Idx+1] << 8));
+                
+                // X (Channel 3) -> DAC1
+                int16_t x_sample = (int16_t)(SD_Wave_Buffer[SD_Wave_Idx+4] | (SD_Wave_Buffer[SD_Wave_Idx+5] << 8));
+                
+                // Y (Channel 4) -> DAC2
+                int16_t y_sample = (int16_t)(SD_Wave_Buffer[SD_Wave_Idx+6] | (SD_Wave_Buffer[SD_Wave_Idx+7] << 8));
+                
+                // Output
+                // Audio: Convert signed 16-bit to unsigned PWM (0-4095)
+                // (sample + 32768) >> 4
+                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 4);
+                __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, pwm_val * volume / 100);
+                
+                // DAC: 12-bit (0-4095)
+                // Note: DAC Output Buffer is DISABLED, so impedance matching is important.
+                // If the image is distorted, check if the load is too low.
+                uint16_t dac_x = (uint16_t)((x_sample + 32768) >> 4);
+                uint16_t dac_y = (uint16_t)((y_sample + 32768) >> 4);
+                
+                HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_x);
+                HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_12B_R, dac_y);
+                
+                SD_Wave_Idx += 8;
+            }
+            else
+            {
+                SD_Wave_Idx++;
+                if(SD_Wave_Idx >= SD_WAVE_MAX_LEN) SD_Wave_Idx = 0; // Wrap Buffer
+                
+                // Audio Only Mode (Assuming 16-bit Mono WAV)
+                // Read 2 bytes per sample
+                
+                // Check bounds
+                if(SD_Wave_Idx + 2 > SD_WAVE_MAX_LEN) SD_Wave_Idx = 0;
+                
+                int16_t audio_sample = (int16_t)(SD_Wave_Buffer[SD_Wave_Idx] | (SD_Wave_Buffer[SD_Wave_Idx+1] << 8));
+                
+                // Convert signed 16-bit to 12-bit PWM (0-4095)
+                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 4);
+                __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, pwm_val * volume / 100);
+                
+                SD_Wave_Idx += 2;
+            }
         }
         else
         {
@@ -518,7 +573,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             static short int wave_counter=0;
             wave_counter++;
             if(wave_counter==LENGTH_OF_WAVE)wave_counter=0;
-            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, Wave[wave_counter]*volume/100);
+            
+            // Scale 8-bit wave sample (0-255) to 12-bit PWM (0-4095)
+            // __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, (Wave[wave_counter] << 4) * volume / 100);
+            
+            // Silence on startup / Idle
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
         }
   }
   /* USER CODE END Callback 1 */
