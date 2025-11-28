@@ -731,6 +731,7 @@ void Stop_Music(void) {
     osDelay(10); // Wait for AudioTask to pause
     f_close(&fil);
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
 }
 
 

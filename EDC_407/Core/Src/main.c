@@ -182,6 +182,8 @@ int main(void)
 	
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0); // Ensure PWM is 0 at startup
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0); // Ensure PWM is 0 at startup
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_TIM_Encoder_Start(&htim8, TIM_CHANNEL_ALL);
 
@@ -532,10 +534,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 int16_t y_sample = (int16_t)(SD_Wave_Buffer[SD_Wave_Idx+6] | (SD_Wave_Buffer[SD_Wave_Idx+7] << 8));
                 
                 // Output
-                // Audio: Convert signed 16-bit to unsigned PWM (0-511)
-                // (sample + 32768) >> 7
-                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 7);
+                // Audio: Convert signed 16-bit to unsigned PWM (0-4095)
+                // (sample + 32768) >> 4
+                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 4);
                 __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, pwm_val * volume / 100);
+                __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_val * volume / 100);
                 
                 // DAC: 12-bit (0-4095)
                 // Note: DAC Output Buffer is DISABLED, so impedance matching is important.
@@ -561,9 +564,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 
                 int16_t audio_sample = (int16_t)(SD_Wave_Buffer[SD_Wave_Idx] | (SD_Wave_Buffer[SD_Wave_Idx+1] << 8));
                 
-                // Convert signed 16-bit to 9-bit PWM (0-511)
-                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 7);
+                // Convert signed 16-bit to 12-bit PWM (0-4095)
+                uint16_t pwm_val = (uint16_t)((audio_sample + 32768) >> 4);
                 __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, pwm_val * volume / 100);
+                __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_val * volume / 100);
                 
                 SD_Wave_Idx += 2;
             }
@@ -580,6 +584,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             
             // Silence on startup / Idle
             __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
         }
   }
   /* USER CODE END Callback 1 */
