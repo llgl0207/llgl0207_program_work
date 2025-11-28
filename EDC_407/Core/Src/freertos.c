@@ -45,6 +45,7 @@ typedef enum {
     UI_MENU_GAME_LIST,
     UI_GAME,
     UI_BREAKOUT,
+    UI_FLAPPY,
     UI_DEBUG_INPUT,
     UI_SETTINGS,
     UI_SETTINGS_DRAW_MODE,
@@ -66,6 +67,16 @@ typedef enum {
 #define BRK_COLS 8
 #define BRK_BRICK_W (4096 / BRK_COLS)
 #define BRK_BRICK_H 250
+
+// --- Flappy Game Defines ---
+#define FLP_GRAVITY 4
+#define FLP_JUMP_FORCE 70
+#define FLP_SPEED 30
+#define FLP_GAP_H 1100
+#define FLP_OBSTACLE_W 300
+#define FLP_OBSTACLE_SPACING 1600
+#define FLP_PLAYER_X 1000
+#define FLP_PLAYER_R 80
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -139,6 +150,25 @@ int brk_lives = 3;
 int brk_game_over = 0;
 int brk_brick_count = 0;
 
+// --- Flappy Game Variables ---
+typedef struct {
+    int32_t y;
+    int32_t vy;
+} FlpPlayer;
+
+typedef struct {
+    int32_t x;
+    int32_t gap_y; // Center of gap
+    int active;
+    int passed;
+} FlpObstacle;
+
+#define FLP_MAX_OBSTACLES 3
+FlpPlayer flp_player;
+FlpObstacle flp_obstacles[FLP_MAX_OBSTACLES];
+int flp_score = 0;
+int flp_game_over = 0;
+
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId myTask02Handle;
@@ -156,6 +186,8 @@ void Init_Snake_Game(void);
 void Update_Snake_Game(void);
 void Init_Breakout_Game(void);
 void Update_Breakout_Game(int16_t encoder_delta);
+void Init_Flappy_Game(void);
+void Update_Flappy_Game(int jump_requested);
 
 // --- Scroll State Management ---
 #define MAX_SCROLL_STATES 16
@@ -455,9 +487,10 @@ void GuiTask(void const * argument)
   const char *game_menu_items[] = {
       "BACK",
       "SNAKE",
-      "BREAKOUT"
+      "BREAKOUT",
+      "FLAPPY DROID"
   };
-  const int game_menu_count = 3;
+  const int game_menu_count = 4;
   
   // Settings Menu Items
   const char *settings_menu_items[] = {
@@ -516,6 +549,8 @@ void GuiTask(void const * argument)
         Update_Snake_Game();
     } else if(ui_state == UI_BREAKOUT) {
         Update_Breakout_Game(delta);
+    } else if(ui_state == UI_FLAPPY) {
+        Update_Flappy_Game(0); // Normal update, jump handled in button section
     } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
         if(delta != 0) {
             int32_t d = (int32_t)DRAW_GetCPUDelay() + delta;
@@ -585,158 +620,189 @@ void GuiTask(void const * argument)
         }
     }
     
+    // --- Flappy Bird Specific Input (Non-blocking) ---
+    if(ui_state == UI_FLAPPY && !flp_game_over) {
+        static uint8_t last_up_state = 1; // Assumes Pull-Up (1=Released)
+        uint8_t current_up_state = HAL_GPIO_ReadPin(KEY_UP_GPIO_Port, KEY_UP_Pin);
+        
+        if(current_up_state == 0 && last_up_state == 1) { // Falling Edge (Press)
+            Update_Flappy_Game(1); // Jump
+        }
+        last_up_state = current_up_state;
+    }
+
     // Button Logic (RS_Pin)
     if(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) {
-        osDelay(50); // Debounce
+        osDelay(20); // Debounce
         if(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) {
-             while(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) osDelay(10);
              
-             if(ui_state == UI_MENU_MAIN) {
-                 if(menu_index == 0) { // Music Player
-                     Scan_Music_Files("/music");
-                     ui_state = UI_MENU_MUSIC_LIST;
-                     menu_mode = 0;
-                     menu_index = 0;
-                     menu_scroll = 0;
-                     last_menu_index = -1; 
-                 } else if(menu_index == 1) { // Video Player
-                     Scan_Music_Files("/video");
-                     ui_state = UI_MENU_MUSIC_LIST;
-                     menu_mode = 1;
-                     menu_index = 0;
+             if(ui_state == UI_FLAPPY) {
+                 // Exit Game
+                 ui_state = UI_MENU_GAME_LIST;
+                 menu_index = 0;
+                 last_menu_index = -1;
+                 while(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) osDelay(10);
+             } 
+             else {
+                 while(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) osDelay(10);
+                 
+                 if(ui_state == UI_MENU_MAIN) {
+                     if(menu_index == 0) { // Music Player
+                         Scan_Music_Files("/music");
+                         ui_state = UI_MENU_MUSIC_LIST;
+                         menu_mode = 0;
+                         menu_index = 0;
+                         menu_scroll = 0;
+                         last_menu_index = -1; 
+                     } else if(menu_index == 1) { // Video Player
+                         Scan_Music_Files("/video");
+                         ui_state = UI_MENU_MUSIC_LIST;
+                         menu_mode = 1;
+                         menu_index = 0;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else if(menu_index == 2) { // Text Browser
+                         Scan_Text_Files("/text");
+                         ui_state = UI_MENU_TEXT_LIST;
+                         menu_mode = 2;
+                         menu_index = 0;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else if(menu_index == 3) { // Debug Input
+                         ui_state = UI_DEBUG_INPUT;
+                         last_menu_index = -1;
+                     } else if(menu_index == 4) { // Game Menu
+                         ui_state = UI_MENU_GAME_LIST;
+                         menu_index = 0;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else if(menu_index == 5) { // Settings
+                         ui_state = UI_SETTINGS;
+                         menu_index = 0;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     }
+                 } else if(ui_state == UI_SETTINGS) {
+                     if(menu_index == 0) { // Back
+                         ui_state = UI_MENU_MAIN;
+                         menu_index = 5;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else if(menu_index == 1) { // Draw Mode
+                         ui_state = UI_SETTINGS_DRAW_MODE;
+                         menu_index = 0;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else if(menu_index == 2) { // CPU Speed
+                         ui_state = UI_SETTINGS_CPU_SPEED;
+                         last_menu_index = -1;
+                     } else if(menu_index == 3) { // Jump Dwell
+                         ui_state = UI_SETTINGS_CPU_JUMP;
+                         last_menu_index = -1;
+                     } else if(menu_index == 4) { // Draw Density
+                         ui_state = UI_SETTINGS_DRAW_DENSITY;
+                         last_menu_index = -1;
+                     }
+                 } else if(ui_state == UI_SETTINGS_DRAW_MODE) {
+                     if(menu_index == 0) { // Back
+                         ui_state = UI_SETTINGS;
+                         menu_index = 1;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else if(menu_index == 1) { // DMA
+                         current_draw_mode_idx = 0;
+                         DRAW_SetMode(DRAW_MODE_DMA);
+                         last_menu_index = -1;
+                     } else if(menu_index == 2) { // CPU
+                         current_draw_mode_idx = 1;
+                         DRAW_SetMode(DRAW_MODE_CPU);
+                         last_menu_index = -1;
+                     }
+                 } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
+                     ui_state = UI_SETTINGS;
+                     menu_index = 2;
                      menu_scroll = 0;
                      last_menu_index = -1;
-                 } else if(menu_index == 2) { // Text Browser
-                     Scan_Text_Files("/text");
+                 } else if(ui_state == UI_SETTINGS_CPU_JUMP) {
+                     ui_state = UI_SETTINGS;
+                     menu_index = 3;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
+                 } else if(ui_state == UI_SETTINGS_DRAW_DENSITY) {
+                     ui_state = UI_SETTINGS;
+                     menu_index = 4;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
+                 } else if(ui_state == UI_MENU_MUSIC_LIST) {
+                     if(menu_index == 0) { // Back
+                         ui_state = UI_MENU_MAIN;
+                         menu_index = 0;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else {
+                         // Play File
+                         strncpy(current_playing_file, music_files[menu_index], MAX_FILENAME_LEN);
+                         if(menu_mode == 0) Play_Music(current_playing_file);
+                         else Play_Video(current_playing_file);
+                         ui_state = UI_PLAYING;
+                         last_menu_index = -1;
+                     }
+                 } else if(ui_state == UI_MENU_TEXT_LIST) {
+                     if(menu_index == 0) { // Back
+                         ui_state = UI_MENU_MAIN;
+                         menu_index = 0;
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else {
+                         // Open Text File
+                         Open_Text_File(music_files[menu_index]);
+                         ui_state = UI_TEXT_VIEWER;
+                         last_menu_index = -1; // Force redraw
+                     }
+                 } else if(ui_state == UI_MENU_GAME_LIST) {
+                     if(menu_index == 0) { // Back
+                         ui_state = UI_MENU_MAIN;
+                         menu_index = 4; // Return to Game option
+                         menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else if(menu_index == 1) { // Snake
+                         Init_Snake_Game();
+                         ui_state = UI_GAME;
+                         last_menu_index = -1;
+                     } else if(menu_index == 2) { // Breakout
+                         Init_Breakout_Game();
+                         ui_state = UI_BREAKOUT;
+                         last_menu_index = -1;
+                     } else if(menu_index == 3) { // Flappy
+                         Init_Flappy_Game();
+                         ui_state = UI_FLAPPY;
+                         last_menu_index = -1;
+                     }
+                 } else if(ui_state == UI_PLAYING) {
+                     Stop_Music();
+                     ui_state = UI_MENU_MUSIC_LIST;
+                     last_menu_index = -1;
+                 } else if(ui_state == UI_TEXT_VIEWER) {
                      ui_state = UI_MENU_TEXT_LIST;
-                     menu_mode = 2;
-                     menu_index = 0;
-                     menu_scroll = 0;
                      last_menu_index = -1;
-                 } else if(menu_index == 3) { // Debug Input
-                     ui_state = UI_DEBUG_INPUT;
-                     last_menu_index = -1;
-                 } else if(menu_index == 4) { // Game Menu
+                 } else if(ui_state == UI_GAME) {
                      ui_state = UI_MENU_GAME_LIST;
                      menu_index = 0;
-                     menu_scroll = 0;
                      last_menu_index = -1;
-                 } else if(menu_index == 5) { // Settings
-                     ui_state = UI_SETTINGS;
+                 } else if(ui_state == UI_BREAKOUT) {
+                     ui_state = UI_MENU_GAME_LIST;
                      menu_index = 0;
-                     menu_scroll = 0;
                      last_menu_index = -1;
-                 }
-             } else if(ui_state == UI_SETTINGS) {
-                 if(menu_index == 0) { // Back
+                 } else if(ui_state == UI_FLAPPY) {
+                     if(flp_game_over) {
+                        ui_state = UI_MENU_GAME_LIST;
+                        menu_index = 0;
+                        last_menu_index = -1;
+                     }
+                 } else if(ui_state == UI_DEBUG_INPUT) {
                      ui_state = UI_MENU_MAIN;
-                     menu_index = 5;
-                     menu_scroll = 0;
-                     last_menu_index = -1;
-                 } else if(menu_index == 1) { // Draw Mode
-                     ui_state = UI_SETTINGS_DRAW_MODE;
-                     menu_index = 0;
-                     menu_scroll = 0;
-                     last_menu_index = -1;
-                 } else if(menu_index == 2) { // CPU Speed
-                     ui_state = UI_SETTINGS_CPU_SPEED;
-                     last_menu_index = -1;
-                 } else if(menu_index == 3) { // Jump Dwell
-                     ui_state = UI_SETTINGS_CPU_JUMP;
-                     last_menu_index = -1;
-                 } else if(menu_index == 4) { // Draw Density
-                     ui_state = UI_SETTINGS_DRAW_DENSITY;
                      last_menu_index = -1;
                  }
-             } else if(ui_state == UI_SETTINGS_DRAW_MODE) {
-                 if(menu_index == 0) { // Back
-                     ui_state = UI_SETTINGS;
-                     menu_index = 1;
-                     menu_scroll = 0;
-                     last_menu_index = -1;
-                 } else if(menu_index == 1) { // DMA
-                     current_draw_mode_idx = 0;
-                     DRAW_SetMode(DRAW_MODE_DMA);
-                     last_menu_index = -1;
-                 } else if(menu_index == 2) { // CPU
-                     current_draw_mode_idx = 1;
-                     DRAW_SetMode(DRAW_MODE_CPU);
-                     last_menu_index = -1;
-                 }
-             } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
-                 ui_state = UI_SETTINGS;
-                 menu_index = 2;
-                 menu_scroll = 0;
-                 last_menu_index = -1;
-             } else if(ui_state == UI_SETTINGS_CPU_JUMP) {
-                 ui_state = UI_SETTINGS;
-                 menu_index = 3;
-                 menu_scroll = 0;
-                 last_menu_index = -1;
-             } else if(ui_state == UI_SETTINGS_DRAW_DENSITY) {
-                 ui_state = UI_SETTINGS;
-                 menu_index = 4;
-                 menu_scroll = 0;
-                 last_menu_index = -1;
-             } else if(ui_state == UI_MENU_MUSIC_LIST) {
-                 if(menu_index == 0) { // Back
-                     ui_state = UI_MENU_MAIN;
-                     menu_index = 0;
-                     menu_scroll = 0;
-                     last_menu_index = -1;
-                 } else {
-                     // Play File
-                     strncpy(current_playing_file, music_files[menu_index], MAX_FILENAME_LEN);
-                     if(menu_mode == 0) Play_Music(current_playing_file);
-                     else Play_Video(current_playing_file);
-                     ui_state = UI_PLAYING;
-                     last_menu_index = -1;
-                 }
-             } else if(ui_state == UI_MENU_TEXT_LIST) {
-                 if(menu_index == 0) { // Back
-                     ui_state = UI_MENU_MAIN;
-                     menu_index = 0;
-                     menu_scroll = 0;
-                     last_menu_index = -1;
-                 } else {
-                     // Open Text File
-                     Open_Text_File(music_files[menu_index]);
-                     ui_state = UI_TEXT_VIEWER;
-                     last_menu_index = -1; // Force redraw
-                 }
-             } else if(ui_state == UI_MENU_GAME_LIST) {
-                 if(menu_index == 0) { // Back
-                     ui_state = UI_MENU_MAIN;
-                     menu_index = 4; // Return to Game option
-                     menu_scroll = 0;
-                     last_menu_index = -1;
-                 } else if(menu_index == 1) { // Snake
-                     Init_Snake_Game();
-                     ui_state = UI_GAME;
-                     last_menu_index = -1;
-                 } else if(menu_index == 2) { // Breakout
-                     Init_Breakout_Game();
-                     ui_state = UI_BREAKOUT;
-                     last_menu_index = -1;
-                 }
-             } else if(ui_state == UI_PLAYING) {
-                 Stop_Music();
-                 ui_state = UI_MENU_MUSIC_LIST;
-                 last_menu_index = -1;
-             } else if(ui_state == UI_TEXT_VIEWER) {
-                 ui_state = UI_MENU_TEXT_LIST;
-                 last_menu_index = -1;
-             } else if(ui_state == UI_GAME) {
-                 ui_state = UI_MENU_GAME_LIST;
-                 menu_index = 0;
-                 last_menu_index = -1;
-             } else if(ui_state == UI_BREAKOUT) {
-                 ui_state = UI_MENU_GAME_LIST;
-                 menu_index = 0;
-                 last_menu_index = -1;
-             } else if(ui_state == UI_DEBUG_INPUT) {
-                 ui_state = UI_MENU_MAIN;
-                 last_menu_index = -1;
              }
         }
     }
@@ -761,7 +827,7 @@ void GuiTask(void const * argument)
             last_text_line = current_text_line;
         }
     } else {
-        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_BREAKOUT || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST || ui_state == UI_SETTINGS || ui_state == UI_SETTINGS_DRAW_MODE || ui_state == UI_SETTINGS_CPU_SPEED || ui_state == UI_SETTINGS_CPU_JUMP || ui_state == UI_SETTINGS_DRAW_DENSITY) {
+        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_BREAKOUT || ui_state == UI_FLAPPY || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST || ui_state == UI_SETTINGS || ui_state == UI_SETTINGS_DRAW_MODE || ui_state == UI_SETTINGS_CPU_SPEED || ui_state == UI_SETTINGS_CPU_JUMP || ui_state == UI_SETTINGS_DRAW_DENSITY) {
             redraw = 1;
             blink_state = 1; // Reset blink on move
             // last_blink_time = HAL_GetTick();
@@ -772,12 +838,13 @@ void GuiTask(void const * argument)
         // Save scroll offset before clearing
         saved_scroll_count = 0;
         
-        if((ui_state == UI_GAME && game_over) || (ui_state == UI_BREAKOUT && brk_game_over)) {
+        if((ui_state == UI_GAME && game_over) || (ui_state == UI_BREAKOUT && brk_game_over) || (ui_state == UI_FLAPPY && flp_game_over)) {
             if(ui_state == UI_BREAKOUT && brk_game_over == 2) SaveScroll("YOU WIN");
             else SaveScroll("GAME OVER");
             char s[32]; 
             if(ui_state == UI_GAME) sprintf(s, "SCORE: %d", game_score);
-            else sprintf(s, "SCORE: %d", brk_score);
+            else if(ui_state == UI_BREAKOUT) sprintf(s, "SCORE: %d", brk_score);
+            else sprintf(s, "SCORE: %d", flp_score);
             SaveScroll(s);
         } else if(ui_state == UI_MENU_MAIN || ui_state == UI_MENU_GAME_LIST || ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST || ui_state == UI_SETTINGS || ui_state == UI_SETTINGS_DRAW_MODE) {
              // Determine items to save
@@ -963,6 +1030,51 @@ void GuiTask(void const * argument)
                 sprintf(lives_str, "L:%d", brk_lives);
                 DRAW_AddString(lives_str, 100, 100, 100, 10, 10);
             }
+        } else if(ui_state == UI_FLAPPY) {
+            // Draw Border
+            DRAW_AddRect(0, 0, 4095, 4095);
+            
+            // Draw Player (Droid Head)
+            DRAW_AddCircle(FLP_PLAYER_X, flp_player.y, FLP_PLAYER_R);
+            // Antennas
+            DRAW_AddLine(FLP_PLAYER_X - 40, flp_player.y + 60, FLP_PLAYER_X - 80, flp_player.y + 150);
+            DRAW_AddLine(FLP_PLAYER_X + 40, flp_player.y + 60, FLP_PLAYER_X + 80, flp_player.y + 150);
+            
+            // Draw Obstacles
+            for(int i=0; i<FLP_MAX_OBSTACLES; i++) {
+                if(flp_obstacles[i].active) {
+                    int x = flp_obstacles[i].x;
+                    int gap_y = flp_obstacles[i].gap_y;
+                    int w = FLP_OBSTACLE_W;
+                    int h_gap = FLP_GAP_H / 2;
+                    
+                    // Top Obstacle (from gap top to screen top)
+                    int top_y = gap_y + h_gap;
+                    if(top_y < 4096) {
+                        DRAW_AddRect(x, top_y, w, 4096 - top_y);
+                    }
+                    
+                    // Bottom Obstacle (from 0 to gap bottom)
+                    int bot_y = gap_y - h_gap;
+                    if(bot_y > 0) {
+                        DRAW_AddRect(x, 0, w, bot_y);
+                    }
+                }
+            }
+            
+            if(flp_game_over) {
+                int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 15, 15);
+                RestoreScroll(s1, "GAME OVER");
+                
+                char score_str[32];
+                sprintf(score_str, "SCORE: %d   ", flp_score);
+                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
+                RestoreScroll(s2, score_str);
+            } else {
+                char score_str[16];
+                sprintf(score_str, "%d", flp_score);
+                DRAW_AddString(score_str, 100, 2000, 3800, 15, 15);
+            }
         } else if(ui_state == UI_PLAYING) {
             DRAW_AddString("PLAYING:", 100, 100, 3500, 15, 15);
             DRAW_AddString(current_playing_file, 100, 100, 3000, 15, 15);
@@ -1060,7 +1172,12 @@ void GuiTask(void const * argument)
         }
     }
     
-    osDelay(10);
+    // Force continuous refresh for CPU mode to prevent static image fading
+    if(current_draw_mode_idx == 1) {
+        osDelay(1); // Minimal delay to allow other tasks
+    } else {
+        osDelay(10);
+    }
   }
   /* USER CODE END GuiTask */
 }
@@ -1489,6 +1606,85 @@ void Update_Breakout_Game(int16_t encoder_delta) {
                 brk_brick_count--;
                 if(brk_brick_count <= 0) brk_game_over = 2; // Win
             }
+        }
+    }
+}
+
+void Init_Flappy_Game(void) {
+    flp_player.y = 2048;
+    flp_player.vy = 0;
+    
+    flp_score = 0;
+    flp_game_over = 0;
+    
+    // Init Obstacles
+    for(int i=0; i<FLP_MAX_OBSTACLES; i++) {
+        flp_obstacles[i].active = 1;
+        flp_obstacles[i].x = 4096 + 500 + (i * FLP_OBSTACLE_SPACING);
+        flp_obstacles[i].gap_y = 1000 + (rand() % 2096); // 1000 to 3096
+        flp_obstacles[i].passed = 0;
+    }
+}
+
+void Update_Flappy_Game(int jump_requested) {
+    if(flp_game_over) return;
+    
+    // Physics
+    if(jump_requested) {
+        flp_player.vy = FLP_JUMP_FORCE;
+    }
+    
+    flp_player.y += flp_player.vy;
+    flp_player.vy -= FLP_GRAVITY;
+    
+    // Cap Velocity
+    if(flp_player.vy < -50) flp_player.vy = -50;
+    if(flp_player.vy > 50) flp_player.vy = 50;
+    
+    // Floor/Ceiling Collision
+    if(flp_player.y < FLP_PLAYER_R) {
+        flp_player.y = FLP_PLAYER_R;
+        flp_game_over = 1;
+    }
+    if(flp_player.y > 4096 - FLP_PLAYER_R) {
+        flp_player.y = 4096 - FLP_PLAYER_R;
+        flp_player.vy = 0;
+    }
+    
+    // Obstacles
+    for(int i=0; i<FLP_MAX_OBSTACLES; i++) {
+        flp_obstacles[i].x -= FLP_SPEED;
+        
+        // Recycle
+        if(flp_obstacles[i].x < -FLP_OBSTACLE_W) {
+            // Find max x to place after
+            int max_x = 0;
+            for(int j=0; j<FLP_MAX_OBSTACLES; j++) {
+                if(flp_obstacles[j].x > max_x) max_x = flp_obstacles[j].x;
+            }
+            flp_obstacles[i].x = max_x + FLP_OBSTACLE_SPACING;
+            flp_obstacles[i].gap_y = 1000 + (rand() % 2096);
+            flp_obstacles[i].passed = 0;
+        }
+        
+        // Collision
+        int ox = flp_obstacles[i].x;
+        int ow = FLP_OBSTACLE_W;
+        int gap_top = flp_obstacles[i].gap_y + FLP_GAP_H/2;
+        int gap_bot = flp_obstacles[i].gap_y - FLP_GAP_H/2;
+        
+        // Horizontal Check
+        if(FLP_PLAYER_X + FLP_PLAYER_R > ox && FLP_PLAYER_X - FLP_PLAYER_R < ox + ow) {
+            // Vertical Check (Hit Top or Hit Bottom)
+            if(flp_player.y + FLP_PLAYER_R > gap_top || flp_player.y - FLP_PLAYER_R < gap_bot) {
+                flp_game_over = 1;
+            }
+        }
+        
+        // Score
+        if(!flp_obstacles[i].passed && flp_obstacles[i].x + ow < FLP_PLAYER_X - FLP_PLAYER_R) {
+            flp_score++;
+            flp_obstacles[i].passed = 1;
         }
     }
 }

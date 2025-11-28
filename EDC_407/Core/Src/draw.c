@@ -1,5 +1,6 @@
 #include "draw.h"
 #include "dac.h"
+#include "tim.h"
 #include <math.h>
 #include <string.h>
 
@@ -339,6 +340,22 @@ static uint32_t draw_density = 100; // 100 = 1.0x (Normal), 200 = 2.0x (Slower/B
 
 void DRAW_SetCPUDelay(uint32_t delay){
     cpu_draw_delay = delay;
+    
+    // Set Prescaler to 0 for maximum resolution (84MHz clock -> 11.9ns tick)
+    __HAL_TIM_SET_PRESCALER(&htim14, 0);
+    
+    // Map delay to ARR.
+    // Previous: PSC=40, ARR=4 => ~2.5us
+    // New: PSC=0. To get 2.5us, ARR ~= 210.
+    // To allow faster speed for high density, we start lower.
+    // delay=0   -> ARR=20  (~0.24us) -> 10x faster than before
+    // delay=10  -> ARR=220 (~2.6us)  -> Similar to previous max speed
+    // delay=100 -> ARR=2020 (~24us)
+    
+    uint32_t arr = 20 + (delay * 20);
+    if(arr > 65535) arr = 65535;
+    
+    __HAL_TIM_SET_AUTORELOAD(&htim14, arr);
 }
 
 uint32_t DRAW_GetCPUDelay(void){
@@ -374,6 +391,9 @@ void DRAW_SetMode(DrawMode mode){
 }
 
 static void DRAW_Render_CPU(void){
+    // Start Timer 14 for timing control
+    HAL_TIM_Base_Start(&htim14);
+
     // Iterate objects and draw directly to DAC
     for(int i=0; i<MAX_DRAW_OBJS; i++){
         if(!draw_pool[i].active) continue;
@@ -457,10 +477,9 @@ static void DRAW_Render_CPU(void){
                             
                             hdac.Instance->DHR12RD = ((uint32_t)py << 16) | (uint32_t)px;
                             
-                            // Delay for drawing speed
-                            if(cpu_draw_delay > 0) {
-                                for(volatile int w=0; w<cpu_draw_delay; w++);
-                            }
+                            // Wait for Timer 14 Update Flag
+                            __HAL_TIM_CLEAR_FLAG(&htim14, TIM_FLAG_UPDATE);
+                            while(__HAL_TIM_GET_FLAG(&htim14, TIM_FLAG_UPDATE) == RESET);
                         }
                     }
                     cursor_x += char_w + draw_pool[i].data.text_data.spacing;
@@ -489,9 +508,10 @@ static void DRAW_Render_CPU(void){
                 int32_t py = y0 + (dy * s) / steps;
                 if(px > 4095) px = 4095; if(py > 4095) py = 4095;
                 hdac.Instance->DHR12RD = ((uint32_t)py << 16) | (uint32_t)px;
-                if(cpu_draw_delay > 0) {
-                    for(volatile int w=0; w<cpu_draw_delay; w++);
-                }
+                
+                // Wait for Timer 14 Update Flag
+                __HAL_TIM_CLEAR_FLAG(&htim14, TIM_FLAG_UPDATE);
+                while(__HAL_TIM_GET_FLAG(&htim14, TIM_FLAG_UPDATE) == RESET);
             }
         }
         else if(draw_pool[i].type == DRAW_TYPE_RECT)
@@ -511,8 +531,19 @@ static void DRAW_Render_CPU(void){
             if(steps_init < 2) steps_init = 2;
             
             hdac.Instance->DHR12RD = ((uint32_t)y << 16) | (uint32_t)x;
+            
+            // Dwell at start point to allow beam to settle (hide jump line)
+            // Use Timer 14 for precise dwell if needed, or just busy wait
             if(cpu_jump_dwell > 0) {
+                // Use TIM14 for dwell? No, cpu_jump_dwell is a raw loop count in current UI.
+                // Let's keep it simple loop for now, but maybe user needs to increase it.
                 for(volatile int w=0; w<cpu_jump_dwell; w++);
+            } else {
+                // Even if 0, we might need a tiny wait for DAC settling if jump lines are visible
+                // But user asked for "no delay". 
+                // To HIDE jump lines, we actually need to wait at the destination so the beam
+                // spends more time at the start point than traveling.
+                // If we start drawing immediately, the travel time is part of the duty cycle.
             }
 
             for(int l=0; l<4; l++){
@@ -541,9 +572,10 @@ static void DRAW_Render_CPU(void){
                     int32_t py = y0 + (dy * s) / steps;
                     if(px > 4095) px = 4095; if(py > 4095) py = 4095;
                     hdac.Instance->DHR12RD = ((uint32_t)py << 16) | (uint32_t)px;
-                    if(cpu_draw_delay > 0) {
-                        for(volatile int w=0; w<cpu_draw_delay; w++);
-                    }
+                    
+                    // Wait for Timer 14 Update Flag
+                    __HAL_TIM_CLEAR_FLAG(&htim14, TIM_FLAG_UPDATE);
+                    while(__HAL_TIM_GET_FLAG(&htim14, TIM_FLAG_UPDATE) == RESET);
                 }
             }
         }
@@ -572,12 +604,14 @@ static void DRAW_Render_CPU(void){
                 int32_t py = cy + (int32_t)(sinf(angle) * r);
                 if(px > 4095) px = 4095; if(py > 4095) py = 4095;
                 hdac.Instance->DHR12RD = ((uint32_t)py << 16) | (uint32_t)px;
-                if(cpu_draw_delay > 0) {
-                    for(volatile int w=0; w<cpu_draw_delay; w++);
-                }
+                
+                // Wait for Timer 14 Update Flag
+                __HAL_TIM_CLEAR_FLAG(&htim14, TIM_FLAG_UPDATE);
+                while(__HAL_TIM_GET_FLAG(&htim14, TIM_FLAG_UPDATE) == RESET);
             }
         }
     }
+    HAL_TIM_Base_Stop(&htim14);
 }
 
 void DRAW_Render(void){
