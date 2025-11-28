@@ -192,6 +192,10 @@ typedef struct {
           int32_t x, y;
           uint16_t sx, sy;
           uint16_t spacing;
+          int32_t scroll_offset;
+          uint32_t last_scroll_time;
+          int32_t total_width;
+          int32_t view_width;
       } text_data;
       struct {
           int32_t x0, y0, x1, y1;
@@ -289,6 +293,33 @@ static uint8_t set_pattern_by_char(char c){
   return 0;
 }
 
+void DRAW_Update(void){
+    uint32_t now = HAL_GetTick();
+    uint8_t need_render = 0;
+    
+    for(int i=0; i<MAX_DRAW_OBJS; i++){
+        if(draw_pool[i].active && draw_pool[i].type == DRAW_TYPE_TEXT){
+            // Check if scrolling is needed
+            if(draw_pool[i].data.text_data.total_width > draw_pool[i].data.text_data.view_width){
+                if(now - draw_pool[i].data.text_data.last_scroll_time > 20){ // 20ms update rate
+                    draw_pool[i].data.text_data.last_scroll_time = now;
+                    draw_pool[i].data.text_data.scroll_offset += 50; // Scroll speed
+                    
+                    // Wrap around
+                    if(draw_pool[i].data.text_data.scroll_offset > draw_pool[i].data.text_data.total_width + 500){
+                        draw_pool[i].data.text_data.scroll_offset = -draw_pool[i].data.text_data.view_width;
+                    }
+                    need_render = 1;
+                }
+            }
+        }
+    }
+    
+    if(need_render){
+        DRAW_Render();
+    }
+}
+
 void DRAW_Render(void){
     DAC_Buff_Count = 0;
     
@@ -317,6 +348,7 @@ void DRAW_Render(void){
                 int32_t cursor_y = draw_pool[i].data.text_data.y;
                 uint16_t sx = draw_pool[i].data.text_data.sx;
                 uint16_t sy = draw_pool[i].data.text_data.sy;
+                int32_t scroll = draw_pool[i].data.text_data.scroll_offset;
                 
                 for(int c=0; c<MAX_STR_LEN; c++){
                     char ch = draw_pool[i].data.text_data.text[c];
@@ -339,6 +371,18 @@ void DRAW_Render(void){
                         minx *= pre_scale;
                         maxx *= pre_scale;
                         
+                        int32_t char_w = ((maxx - minx) * (int32_t)sx) / 100;
+                        int32_t draw_x = cursor_x - scroll;
+                        
+                        // Visibility Check
+                        if(draw_x + char_w < 0) {
+                             cursor_x += char_w + draw_pool[i].data.text_data.spacing;
+                             continue; 
+                        }
+                        if(draw_x > 4096) {
+                             break; 
+                        }
+
                         // Draw each line in the pattern
                         for(int l=0; l<current_pattern_length; l++){
                             int32_t x0 = current_pattern[l].x0 * pre_scale;
@@ -347,9 +391,9 @@ void DRAW_Render(void){
                             int32_t y1 = current_pattern[l].y1 * pre_scale;
                             
                             // Transform
-                            int32_t tx0 = (x0 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100;
+                            int32_t tx0 = (x0 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100 - scroll;
                             int32_t ty0 = (y0 * (int32_t)sy) / 100 + cursor_y;
-                            int32_t tx1 = (x1 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100;
+                            int32_t tx1 = (x1 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100 - scroll;
                             int32_t ty1 = (y1 * (int32_t)sy) / 100 + cursor_y;
                             
                             // Interpolate line
@@ -363,19 +407,24 @@ void DRAW_Render(void){
                             
                             for(int s=0; s<=steps; s++){
                                 if(DAC_Buff_Count >= DRAW_BUF_SIZE) break;
-                                DAC_Buff_X[DAC_Buff_Count] = tx0 + (dx * s) / steps;
-                                DAC_Buff_Y[DAC_Buff_Count] = ty0 + (dy * s) / steps;
+                                int32_t px = tx0 + (dx * s) / steps;
+                                int32_t py = ty0 + (dy * s) / steps;
                                 
-                                // Clip
-                                if(DAC_Buff_X[DAC_Buff_Count] > 4095) DAC_Buff_X[DAC_Buff_Count] = 4095;
-                                if(DAC_Buff_Y[DAC_Buff_Count] > 4095) DAC_Buff_Y[DAC_Buff_Count] = 4095;
+                                // Clamp
+                                if(px < 0) px = 0;
+                                if(px > 4095) px = 4095;
+                                if(py < 0) py = 0;
+                                if(py > 4095) py = 4095;
+                                
+                                DAC_Buff_X[DAC_Buff_Count] = (uint16_t)px;
+                                DAC_Buff_Y[DAC_Buff_Count] = (uint16_t)py;
                                 
                                 DAC_Buff_Count++;
                             }
                         }
                         
                         // Advance cursor
-                        cursor_x += ((maxx - minx) * (int32_t)sx) / 100 + draw_pool[i].data.text_data.spacing;
+                        cursor_x += char_w + draw_pool[i].data.text_data.spacing;
                     }
                 }
             }
@@ -500,6 +549,35 @@ uint8_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y, ui
   draw_pool[slot].data.text_data.sx = sx;
   draw_pool[slot].data.text_data.sy = sy;
   draw_pool[slot].data.text_data.spacing = spacing;
+  
+  // Initialize scrolling
+  draw_pool[slot].data.text_data.scroll_offset = 0;
+  draw_pool[slot].data.text_data.last_scroll_time = HAL_GetTick();
+  draw_pool[slot].data.text_data.view_width = 4096; // Default to full screen width
+  
+  // Calculate total width
+  int32_t width = 0;
+  for(int c=0; c<MAX_STR_LEN; c++){
+      char ch = draw_pool[slot].data.text_data.text[c];
+      if(ch == 0) break;
+      if(ch == ' '){
+          width += (2000 * (int32_t)sx) / 100 + spacing;
+          continue;
+      }
+      if(set_pattern_by_char(ch)){
+          int32_t minx, maxx;
+          compute_pattern_minmax_x(current_pattern, current_pattern_length, &minx, &maxx);
+          int32_t pre_scale = 1;
+          if((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')){
+              pre_scale = 512;
+          }
+          minx *= pre_scale;
+          maxx *= pre_scale;
+          width += ((maxx - minx) * (int32_t)sx) / 100 + spacing;
+      }
+  }
+  draw_pool[slot].data.text_data.total_width = width;
+
   draw_pool[slot].active = 1;
   
   // Update buffer immediately

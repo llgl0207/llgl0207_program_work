@@ -41,6 +41,9 @@ void DRAW_Clear(void);
 // Internal function to update the DMA buffer
 void DRAW_Render(void);
 
+// Periodic update for animations (scrolling)
+void DRAW_Update(void);
+
 // Terminal functions
 void DRAW_Terminal_Init(uint16_t scale_pct, int32_t spacing);
 void DRAW_Terminal_SetSpacing(int32_t spacing);

@@ -22,11 +22,16 @@ Dialog DLL:      TCM.DLL V1.36.1.0
  
 <h2>Project:</h2>
 E:\github\llgl0207_program_work\EDC_407\MDK-ARM\EDC_407.uvprojx
-Project File Date:  11/27/2025
+Project File Date:  11/28/2025
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 6 (build 750)', folder: 'D:\Program Files\Keil_v5\ARM\ARMCC\Bin'
 Build target 'EDC_407'
+compiling draw.c...
+compiling freertos.c...
+../Core/Src/freertos.c(276): warning:  #550-D: variable "res"  was set but never used
+              FRESULT res;
+../Core/Src/freertos.c: 1 warning, 0 errors
 compiling main.c...
 ../Core/Src/main.c(355): warning:  #9-D: nested comment is not allowed
   		/*DRAW_Clear();
@@ -47,12 +52,8 @@ compiling main.c...
 ../Core/Src/main.c(68): warning:  #550-D: variable "count_S"  was set but never used
   static int count_S=0;
 ../Core/Src/main.c: 9 warnings, 0 errors
-compiling freertos.c...
-../Core/Src/freertos.c(276): warning:  #550-D: variable "res"  was set but never used
-              FRESULT res;
-../Core/Src/freertos.c: 1 warning, 0 errors
 linking...
-Program Size: Code=53180 RO-data=5788 RW-data=916 ZI-data=98964  
+Program Size: Code=53628 RO-data=5788 RW-data=916 ZI-data=99476  
 FromELF: creating hex file...
 "EDC_407\EDC_407.axf" - 0 Error(s), 10 Warning(s).
 
@@ -77,7 +78,7 @@ Package Vendor: Keil
 <h2>Collection of Component Files used:</h2>
 
    * Component: ARM::CMSIS:CORE:5.1.2
-Build Time Elapsed:  00:00:03
+Build Time Elapsed:  00:00:02
 </pre>
 </body>
 </html>

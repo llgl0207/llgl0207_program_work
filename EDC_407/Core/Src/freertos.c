@@ -339,11 +339,11 @@ void GuiTask(void const * argument)
   
   // Main Menu Items
   const char *main_menu_items[] = {
-      "Music Player",
-      "Video Player",
-      "Settings",
-      "About",
-      "Exit"
+      "MUSIC PLAYER",
+      "VIDEO PLAYER",
+      "SETTINGS",   
+      "ABOUT",
+      "EXIT"
   };
   const int main_menu_count = 5;
   
@@ -353,10 +353,6 @@ void GuiTask(void const * argument)
   int last_menu_index = -1;
   int last_menu_scroll = -1;
   int menu_mode = 0; // 0: Music, 1: Video
-  
-  // Scrolling Text Variables
-  uint32_t last_scroll_time = 0;
-  int text_scroll_offset = 0;
   
   // UI Constants
   const int line_height = 500;
@@ -371,6 +367,9 @@ void GuiTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+    // Update Drawing Animation
+    DRAW_Update();
+
     HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
     
     // Encoder Logic
@@ -445,14 +444,6 @@ void GuiTask(void const * argument)
         }
     }
     
-    // Scrolling Text Logic
-    if(HAL_GetTick() - last_scroll_time > 300) {
-        last_scroll_time = HAL_GetTick();
-        text_scroll_offset++;
-        // Reset if too long? Handled in render
-        last_menu_index = -1; // Force redraw to update scroll
-    }
-    
     // Render UI
     if((menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING) && !(ui_state == UI_PLAYING && menu_mode == 1)) {
         // Only clear if structure changes, but for now clear always for simplicity
@@ -487,21 +478,7 @@ void GuiTask(void const * argument)
                     
                     // Scrolling Text
                     const char *text = (ui_state == UI_MENU_MAIN) ? main_menu_items[item_idx] : music_files[item_idx];
-                    int len = strlen(text);
-                    char display_text[32];
-                    
-                    if(len > 15) {
-                        int offset = text_scroll_offset % (len + 5); // +5 for pause space
-                        for(int k=0; k<15; k++) {
-                            int char_idx = (offset + k) % (len + 5);
-                            if(char_idx < len) display_text[k] = text[char_idx];
-                            else display_text[k] = ' ';
-                        }
-                        display_text[15] = '\0';
-                        DRAW_AddString(display_text, 100, 400, y_pos, 15, 15);
-                    } else {
-                        DRAW_AddString(text, 100, 400, y_pos, 15, 15);
-                    }
+                    DRAW_AddString(text, 100, 400, y_pos, 15, 15);
                 } else {
                     // Normal Text
                     const char *text = (ui_state == UI_MENU_MAIN) ? main_menu_items[item_idx] : music_files[item_idx];
