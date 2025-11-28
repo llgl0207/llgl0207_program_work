@@ -45,7 +45,7 @@ typedef enum {
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SD_WAVE_MAX_LEN 32768
+#define SD_WAVE_MAX_LEN 16384
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -180,6 +180,8 @@ void StartDefaultTask(void const * argument)
   {
       DRAW_Terminal_Print("MOUNT OK\n");
       
+      /* 
+      // Auto-play test.wav DISABLED to prevent interference with Menu
       // Open WAV file
       res = f_open(&fil, "test.wav", FA_READ);
       if(res == FR_OK)
@@ -228,6 +230,7 @@ void StartDefaultTask(void const * argument)
       {
           DRAW_Terminal_Print("NO test.wav\n");
       }
+      */
   }
   else
   {

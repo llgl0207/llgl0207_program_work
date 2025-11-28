@@ -69,8 +69,9 @@ static int count_S=0;
 uint8_t percentage=5;
 
 // --- SD Waveform Variables ---
-#define SD_WAVE_MAX_LEN 32768 // 32KB Buffer (Mapped to DAC_Buff_X)
-uint8_t *SD_Wave_Buffer; // Pointer to store raw audio data (Points to DAC_Buff_X)
+#define SD_WAVE_MAX_LEN 16384 // 16KB Dedicated Audio Buffer
+uint8_t Audio_Buffer[SD_WAVE_MAX_LEN]; // Dedicated Buffer
+uint8_t *SD_Wave_Buffer; // Pointer to store raw audio data (Points to Audio_Buffer)
 uint32_t SD_Wave_Len = 0;                // Actual length of loaded data
 volatile uint32_t SD_Wave_Idx = 0;       // Current playback position (Read Head) - Modified by ISR
 volatile uint32_t SD_Wave_Write_Idx = 0; // Current write position (Write Head)
@@ -170,7 +171,7 @@ int main(void)
   MX_FATFS_Init();
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
-  SD_Wave_Buffer = (uint8_t*)DAC_Buff_X; // Initialize pointer
+  SD_Wave_Buffer = Audio_Buffer; // Initialize pointer to Dedicated Audio Buffer
   /* 初始化绘图库 */
   DRAW_Init(1000); 
   HAL_TIM_Base_Start(&htim6);  // Start TIM6 for DAC DMA trigger
@@ -549,7 +550,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             }
             else
             {
-                SD_Wave_Idx++;
+                // SD_Wave_Idx++; // Removed incorrect increment
                 if(SD_Wave_Idx >= SD_WAVE_MAX_LEN) SD_Wave_Idx = 0; // Wrap Buffer
                 
                 // Audio Only Mode (Assuming 16-bit Mono WAV)
