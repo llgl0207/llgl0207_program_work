@@ -368,7 +368,9 @@ void GuiTask(void const * argument)
   for(;;)
   {
     // Update Drawing Animation
-    DRAW_Update();
+    if(!Video_Mode) {
+        DRAW_Update();
+    }
 
     HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
     
