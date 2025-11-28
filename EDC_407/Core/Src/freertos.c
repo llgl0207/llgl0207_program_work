@@ -122,6 +122,36 @@ void Open_Text_File(char* filename);
 void Init_Snake_Game(void);
 void Update_Snake_Game(void);
 
+// --- Scroll State Management ---
+#define MAX_SCROLL_STATES 16
+typedef struct {
+    char text[64];
+    int32_t offset;
+} ScrollState;
+
+static ScrollState saved_scroll_states[MAX_SCROLL_STATES];
+static int saved_scroll_count = 0;
+
+static void SaveScroll(const char* txt) {
+    if(saved_scroll_count >= MAX_SCROLL_STATES) return;
+    int32_t off = DRAW_GetTextScroll(txt);
+    if(off != 0) {
+        strncpy(saved_scroll_states[saved_scroll_count].text, txt, 63);
+        saved_scroll_states[saved_scroll_count].text[63] = '\0';
+        saved_scroll_states[saved_scroll_count].offset = off;
+        saved_scroll_count++;
+    }
+}
+
+static void RestoreScroll(int16_t slot, const char* txt) {
+    for(int i=0; i<saved_scroll_count; i++) {
+        if(strncmp(saved_scroll_states[i].text, txt, 63) == 0) {
+            DRAW_SetTextScroll(slot, saved_scroll_states[i].offset);
+            return;
+        }
+    }
+}
+
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void const * argument);
@@ -388,8 +418,8 @@ void GuiTask(void const * argument)
 
   // Game Menu Items
   const char *game_menu_items[] = {
-      "SNAKE",
-      "BACK"
+      "BACK",
+      "SNAKE"
   };
   const int game_menu_count = 2;
   
@@ -409,6 +439,8 @@ void GuiTask(void const * argument)
   
   static uint16_t last_encoder = 0;
   static int32_t encoder_acc = 0;
+  static uint32_t last_blink_time = 0;
+  static int blink_state = 1;
   
   /* Infinite loop */
   for(;;)
@@ -460,6 +492,7 @@ void GuiTask(void const * argument)
             int max_items = 0;
             if(ui_state == UI_MENU_MAIN) max_items = main_menu_count;
             else if(ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST) max_items = music_file_count;
+            else if(ui_state == UI_MENU_GAME_LIST) max_items = game_menu_count;
             
             if(menu_index < 0) menu_index = 0;
             if(menu_index >= max_items) menu_index = max_items - 1;
@@ -530,14 +563,14 @@ void GuiTask(void const * argument)
                      last_menu_index = -1; // Force redraw
                  }
              } else if(ui_state == UI_MENU_GAME_LIST) {
-                 if(menu_index == 0) { // Snake
-                     Init_Snake_Game();
-                     ui_state = UI_GAME;
-                     last_menu_index = -1;
-                 } else { // Back
+                 if(menu_index == 0) { // Back
                      ui_state = UI_MENU_MAIN;
                      menu_index = 4; // Return to Game option
                      menu_scroll = 0;
+                     last_menu_index = -1;
+                 } else { // Snake
+                     Init_Snake_Game();
+                     ui_state = UI_GAME;
                      last_menu_index = -1;
                  }
              } else if(ui_state == UI_PLAYING) {
@@ -561,6 +594,13 @@ void GuiTask(void const * argument)
     // Render UI
     // Check if redraw needed
     int redraw = 0;
+    
+    if(HAL_GetTick() - last_blink_time > 500) {
+        blink_state = !blink_state;
+        last_blink_time = HAL_GetTick();
+        redraw = 1;
+    }
+
     if(ui_state == UI_TEXT_VIEWER) {
         static int last_text_line = -1;
         if(current_text_line != last_text_line) {
@@ -570,10 +610,43 @@ void GuiTask(void const * argument)
     } else {
         if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST) {
             redraw = 1;
+            blink_state = 1; // Reset blink on move
+            last_blink_time = HAL_GetTick();
         }
     }
     
     if(redraw && !(ui_state == UI_PLAYING && menu_mode == 1)) {
+        // Save scroll offset before clearing
+        saved_scroll_count = 0;
+        
+        if(ui_state == UI_GAME && game_over) {
+            SaveScroll("GAME OVER");
+            char s[32]; 
+            sprintf(s, "SCORE: %d", game_score);
+            SaveScroll(s);
+        } else if(ui_state == UI_MENU_MAIN || ui_state == UI_MENU_GAME_LIST || ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST) {
+             // Determine items to save
+             int count = 0;
+             const char **items = NULL;
+             
+             if(ui_state == UI_MENU_MAIN) {
+                 count = main_menu_count;
+                 items = main_menu_items;
+             } else if(ui_state == UI_MENU_GAME_LIST) {
+                 count = game_menu_count;
+                 items = game_menu_items;
+             } else {
+                 count = music_file_count;
+                 items = (const char**)music_files;
+             }
+             
+             for(int i=0; i<visible_lines; i++) {
+                 int item_idx = menu_scroll + i;
+                 if(item_idx >= count) break;
+                 SaveScroll(items[item_idx]);
+             }
+        }
+
         DRAW_Clear();
         
         if(ui_state == UI_DEBUG_INPUT) {
@@ -627,10 +700,13 @@ void GuiTask(void const * argument)
             DRAW_AddLine(fx - f_half, fy + f_half, fx + f_half, fy - f_half);
             
             if(game_over) {
-                DRAW_AddString("GAME OVER", 100, 1000, 2200, 20, 20);
+                int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 20, 20);
+                RestoreScroll(s1, "GAME OVER");
+                
                 char score_str[16];
                 sprintf(score_str, "SCORE: %d", game_score);
-                DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
+                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
+                RestoreScroll(s2, score_str);
             }
         } else if(ui_state == UI_PLAYING) {
             DRAW_AddString("PLAYING:", 100, 100, 3500, 15, 15);
@@ -679,15 +755,17 @@ void GuiTask(void const * argument)
                 
                 // Draw Cursor
                 if(item_idx == menu_index) {
-                    DRAW_AddString(">", 100, 100, y_pos, 15, 15);
+                    if(blink_state) DRAW_AddString(">", 100, 100, y_pos, 15, 15);
                     
                     // Scrolling Text
                     const char *text = items[item_idx];
-                    DRAW_AddString(text, 100, 400, y_pos, 15, 15);
+                    int16_t slot = DRAW_AddString(text, 100, 400, y_pos, 15, 15);
+                    RestoreScroll(slot, text);
                 } else {
                     // Normal Text
                     const char *text = items[item_idx];
-                    DRAW_AddString(text, 100, 400, y_pos, 15, 15);
+                    int16_t slot = DRAW_AddString(text, 100, 400, y_pos, 15, 15);
+                    RestoreScroll(slot, text);
                 }
             }
         }

@@ -534,12 +534,14 @@ void DRAW_SetOffset(int16_t offset_x_param, int16_t offset_y_param){
   offset_y = offset_y_param;
 }
 
-uint8_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y, uint16_t sx, uint16_t sy){
+uint8_t set_pattern_by_char(char c); // Forward declaration fix if needed, but it's static
+
+int16_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y, uint16_t sx, uint16_t sy){
   int slot = -1;
   for(int i=0; i<MAX_DRAW_OBJS; i++){
     if(!draw_pool[i].active){ slot = i; break; }
   }
-  if(slot < 0) return 0;
+  if(slot < 0) return -1;
 
   draw_pool[slot].type = DRAW_TYPE_TEXT;
   strncpy(draw_pool[slot].data.text_data.text, s, MAX_STR_LEN-1);
@@ -583,7 +585,24 @@ uint8_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y, ui
   // Update buffer immediately
   DRAW_Render();
   
-  return 1;
+  return (int16_t)slot;
+}
+
+int32_t DRAW_GetTextScroll(const char *text) {
+    for(int i=0; i<MAX_DRAW_OBJS; i++){
+        if(draw_pool[i].active && draw_pool[i].type == DRAW_TYPE_TEXT){
+            if(strncmp(draw_pool[i].data.text_data.text, text, MAX_STR_LEN) == 0){
+                return draw_pool[i].data.text_data.scroll_offset;
+            }
+        }
+    }
+    return 0;
+}
+
+void DRAW_SetTextScroll(int16_t slot, int32_t scroll) {
+    if(slot >= 0 && slot < MAX_DRAW_OBJS && draw_pool[slot].active && draw_pool[slot].type == DRAW_TYPE_TEXT){
+        draw_pool[slot].data.text_data.scroll_offset = scroll;
+    }
 }
 
 uint8_t DRAW_AddLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1){

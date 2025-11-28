@@ -26,9 +26,13 @@ void DRAW_SetLetter(char c);
 void DRAW_SetScale(uint16_t scale_x_percent, uint16_t scale_y_percent);
 void DRAW_SetOffset(int16_t offset_x, int16_t offset_y);
 
-// Add a string to the display pool. Returns 1 if successful, 0 if pool full.
-uint8_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y,
+// Add a string to the display pool. Returns slot index if successful, -1 if pool full.
+int16_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y,
                        uint16_t scale_x, uint16_t scale_y);
+
+// Get/Set scroll offset for text objects
+int32_t DRAW_GetTextScroll(const char *text);
+void DRAW_SetTextScroll(int16_t slot, int32_t scroll);
 
 // Add geometric shapes
 uint8_t DRAW_AddLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
