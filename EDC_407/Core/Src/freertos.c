@@ -385,10 +385,10 @@ void GuiTask(void const * argument)
     // Handle Volume in Playing State
     if(ui_state == UI_PLAYING) {
         if(delta != 0) {
-             volume += delta; // Adjust volume directly
-             // Clamp volume? Assuming uint16_t wraps or is handled elsewhere
-             // Let's clamp to 0-100 for safety if it was percentage, but here it seems to be raw amplitude scaler?
-             // Previous code: volume += delta/4. Let's keep it simple.
+             int32_t new_vol = (int32_t)volume + (delta * 10);
+             if(new_vol > 2000) new_vol = 2000;
+             if(new_vol < 0) new_vol = 0;
+             volume = (uint16_t)new_vol;
         }
     } else {
         // Menu Navigation
