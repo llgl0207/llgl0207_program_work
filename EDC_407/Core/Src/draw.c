@@ -180,7 +180,7 @@ static int32_t offset_x = 0;
 static int32_t offset_y = 0;
 
 // Memory Pool Settings
-#define MAX_DRAW_OBJS 32
+#define MAX_DRAW_OBJS 40
 #define MAX_STR_LEN 64
 
 typedef struct {
@@ -301,9 +301,9 @@ void DRAW_Update(void){
         if(draw_pool[i].active && draw_pool[i].type == DRAW_TYPE_TEXT){
             // Check if scrolling is needed
             if(draw_pool[i].data.text_data.total_width > draw_pool[i].data.text_data.view_width){
-                if(now - draw_pool[i].data.text_data.last_scroll_time > 20){ // 20ms update rate
+                if(now - draw_pool[i].data.text_data.last_scroll_time > 50){ // 50ms update rate
                     draw_pool[i].data.text_data.last_scroll_time = now;
-                    draw_pool[i].data.text_data.scroll_offset += 50; // Scroll speed
+                    draw_pool[i].data.text_data.scroll_offset += 30; // Scroll speed
                     
                     // Wrap around
                     if(draw_pool[i].data.text_data.scroll_offset > draw_pool[i].data.text_data.total_width + 500){
@@ -583,7 +583,7 @@ int16_t DRAW_AddString(const char *s, uint16_t spacing, int32_t x, int32_t y, ui
   draw_pool[slot].active = 1;
   
   // Update buffer immediately
-  DRAW_Render();
+  // DRAW_Render(); // Removed for performance (Batch Mode)
   
   return (int16_t)slot;
 }
@@ -619,7 +619,7 @@ uint8_t DRAW_AddLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1){
   draw_pool[slot].data.line_data.y1 = y1;
   draw_pool[slot].active = 1;
   
-  DRAW_Render();
+  // DRAW_Render();
   return 1;
 }
 
@@ -637,7 +637,7 @@ uint8_t DRAW_AddRect(int32_t x, int32_t y, int32_t w, int32_t h){
   draw_pool[slot].data.rect_data.h = h;
   draw_pool[slot].active = 1;
   
-  DRAW_Render();
+  // DRAW_Render();
   return 1;
 }
 
@@ -654,7 +654,7 @@ uint8_t DRAW_AddCircle(int32_t x, int32_t y, int32_t r){
   draw_pool[slot].data.circle_data.r = r;
   draw_pool[slot].active = 1;
   
-  DRAW_Render();
+  // DRAW_Render();
   return 1;
 }
 

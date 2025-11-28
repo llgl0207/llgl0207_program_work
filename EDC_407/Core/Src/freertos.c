@@ -44,6 +44,7 @@ typedef enum {
     UI_TEXT_VIEWER,
     UI_MENU_GAME_LIST,
     UI_GAME,
+    UI_BREAKOUT,
     UI_DEBUG_INPUT
 } UI_State;
 /* USER CODE END PTD */
@@ -51,6 +52,15 @@ typedef enum {
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define SD_WAVE_MAX_LEN 16384
+
+// --- Breakout Game Defines ---
+#define BRK_PADDLE_W 800
+#define BRK_PADDLE_H 100
+#define BRK_BALL_R 60
+#define BRK_ROWS 5
+#define BRK_COLS 8
+#define BRK_BRICK_W (4096 / BRK_COLS)
+#define BRK_BRICK_H 250
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -106,6 +116,23 @@ int game_over = 0;
 uint32_t last_game_tick = 0;
 int game_score = 0;
 
+// --- Breakout Game Variables ---
+typedef struct {
+    int32_t x, y;
+    int32_t vx, vy;
+} BrkBall;
+
+typedef struct {
+    int32_t x;
+} BrkPaddle;
+
+uint8_t brk_bricks[BRK_ROWS][BRK_COLS];
+BrkBall brk_ball;
+BrkPaddle brk_paddle;
+int brk_score = 0;
+int brk_lives = 3;
+int brk_game_over = 0;
+
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId myTask02Handle;
@@ -121,6 +148,8 @@ void Scan_Text_Files(const char* path);
 void Open_Text_File(char* filename);
 void Init_Snake_Game(void);
 void Update_Snake_Game(void);
+void Init_Breakout_Game(void);
+void Update_Breakout_Game(int16_t encoder_delta);
 
 // --- Scroll State Management ---
 #define MAX_SCROLL_STATES 16
@@ -419,9 +448,10 @@ void GuiTask(void const * argument)
   // Game Menu Items
   const char *game_menu_items[] = {
       "BACK",
-      "SNAKE"
+      "SNAKE",
+      "BREAKOUT"
   };
-  const int game_menu_count = 2;
+  const int game_menu_count = 3;
   
   // State Variables
   int menu_index = 0;
@@ -450,16 +480,18 @@ void GuiTask(void const * argument)
         DRAW_Update();
     }
 
-    if(ui_state == UI_GAME) {
-        Update_Snake_Game();
-    }
-
     HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
     
     // Encoder Logic
     uint16_t encoder = __HAL_TIM_GET_COUNTER(&htim8);
     int16_t delta = (int16_t)(encoder - last_encoder);
     last_encoder = encoder;
+
+    if(ui_state == UI_GAME) {
+        Update_Snake_Game();
+    } else if(ui_state == UI_BREAKOUT) {
+        Update_Breakout_Game(delta);
+    }
     
     // Handle Volume in Playing State
     if(ui_state == UI_PLAYING) {
@@ -568,9 +600,13 @@ void GuiTask(void const * argument)
                      menu_index = 4; // Return to Game option
                      menu_scroll = 0;
                      last_menu_index = -1;
-                 } else { // Snake
+                 } else if(menu_index == 1) { // Snake
                      Init_Snake_Game();
                      ui_state = UI_GAME;
+                     last_menu_index = -1;
+                 } else if(menu_index == 2) { // Breakout
+                     Init_Breakout_Game();
+                     ui_state = UI_BREAKOUT;
                      last_menu_index = -1;
                  }
              } else if(ui_state == UI_PLAYING) {
@@ -581,6 +617,10 @@ void GuiTask(void const * argument)
                  ui_state = UI_MENU_TEXT_LIST;
                  last_menu_index = -1;
              } else if(ui_state == UI_GAME) {
+                 ui_state = UI_MENU_GAME_LIST;
+                 menu_index = 0;
+                 last_menu_index = -1;
+             } else if(ui_state == UI_BREAKOUT) {
                  ui_state = UI_MENU_GAME_LIST;
                  menu_index = 0;
                  last_menu_index = -1;
@@ -608,7 +648,7 @@ void GuiTask(void const * argument)
             last_text_line = current_text_line;
         }
     } else {
-        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST) {
+        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_BREAKOUT || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST) {
             redraw = 1;
             blink_state = 1; // Reset blink on move
             last_blink_time = HAL_GetTick();
@@ -619,10 +659,11 @@ void GuiTask(void const * argument)
         // Save scroll offset before clearing
         saved_scroll_count = 0;
         
-        if(ui_state == UI_GAME && game_over) {
+        if((ui_state == UI_GAME && game_over) || (ui_state == UI_BREAKOUT && brk_game_over)) {
             SaveScroll("GAME OVER");
             char s[32]; 
-            sprintf(s, "SCORE: %d", game_score);
+            if(ui_state == UI_GAME) sprintf(s, "SCORE: %d", game_score);
+            else sprintf(s, "SCORE: %d", brk_score);
             SaveScroll(s);
         } else if(ui_state == UI_MENU_MAIN || ui_state == UI_MENU_GAME_LIST || ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST) {
              // Determine items to save
@@ -708,6 +749,43 @@ void GuiTask(void const * argument)
                 int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 20, 20);
                 RestoreScroll(s2, score_str);
             }
+        } else if(ui_state == UI_BREAKOUT) {
+            // Draw Border
+            DRAW_AddRect(0, 0, 4095, 4095);
+            
+            // Draw Paddle
+            int py = 200;
+            DRAW_AddRect(brk_paddle.x, py, brk_paddle.x + BRK_PADDLE_W, py + BRK_PADDLE_H);
+            
+            // Draw Ball
+            DRAW_AddCircle(brk_ball.x, brk_ball.y, BRK_BALL_R);
+            
+            // Draw Bricks
+            int brick_start_y = 3000;
+            for(int r=0; r<BRK_ROWS; r++) {
+                for(int c=0; c<BRK_COLS; c++) {
+                    if(brk_bricks[r][c]) {
+                        int bx = c * BRK_BRICK_W;
+                        int by = brick_start_y + (r * BRK_BRICK_H);
+                        DRAW_AddRect(bx + 10, by + 10, bx + BRK_BRICK_W - 10, by + BRK_BRICK_H - 10);
+                    }
+                }
+            }
+            
+            // Draw Score/Lives
+            if(brk_game_over) {
+                int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 20, 20);
+                RestoreScroll(s1, "GAME OVER");
+                
+                char score_str[32];
+                sprintf(score_str, "SCORE: %d   ", brk_score);
+                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 20, 20);
+                RestoreScroll(s2, score_str);
+            } else {
+                char lives_str[16];
+                sprintf(lives_str, "L:%d", brk_lives);
+                DRAW_AddString(lives_str, 100, 100, 100, 10, 10);
+            }
         } else if(ui_state == UI_PLAYING) {
             DRAW_AddString("PLAYING:", 100, 100, 3500, 15, 15);
             DRAW_AddString(current_playing_file, 100, 100, 3000, 15, 15);
@@ -774,9 +852,11 @@ void GuiTask(void const * argument)
         
         last_menu_index = menu_index;
         last_menu_scroll = menu_scroll;
+        
+        DRAW_Render();
     }
     
-    osDelay(50);
+    osDelay(10);
   }
   /* USER CODE END GuiTask */
 }
@@ -1095,6 +1175,99 @@ void Update_Snake_Game(void) {
             // New Food
             snake_food.x = rand() % SNAKE_GRID_SIZE;
             snake_food.y = rand() % SNAKE_GRID_SIZE;
+        }
+    }
+}
+
+void Init_Breakout_Game(void) {
+    // Reset Paddle
+    brk_paddle.x = 2048 - (BRK_PADDLE_W / 2);
+
+    // Reset Ball
+    brk_ball.x = 2048;
+    brk_ball.y = 1500;
+    brk_ball.vx = 30; 
+    brk_ball.vy = 30;
+
+    // Reset Bricks
+    for(int r=0; r<BRK_ROWS; r++) {
+        for(int c=0; c<BRK_COLS; c++) {
+            brk_bricks[r][c] = 1;
+        }
+    }
+
+    brk_score = 0;
+    brk_lives = 3;
+    brk_game_over = 0;
+}
+
+void Update_Breakout_Game(int16_t encoder_delta) {
+    if(brk_game_over) return;
+
+    // Update Paddle
+    brk_paddle.x += encoder_delta * 200; // Sensitivity
+    if(brk_paddle.x < 0) brk_paddle.x = 0;
+    if(brk_paddle.x > 4096 - BRK_PADDLE_W) brk_paddle.x = 4096 - BRK_PADDLE_W;
+
+    // Update Ball
+    brk_ball.x += brk_ball.vx;
+    brk_ball.y += brk_ball.vy;
+
+    // Wall Collisions (Left/Right)
+    if(brk_ball.x <= 0) {
+        brk_ball.x = 0;
+        brk_ball.vx = -brk_ball.vx;
+    }
+    if(brk_ball.x >= 4096) {
+        brk_ball.x = 4096;
+        brk_ball.vx = -brk_ball.vx;
+    }
+    
+    // Top Wall
+    if(brk_ball.y >= 4096) {
+        brk_ball.y = 4096;
+        brk_ball.vy = -brk_ball.vy;
+    }
+
+    // Paddle Collision (Bottom)
+    int paddle_y = 200;
+    
+    if(brk_ball.y <= paddle_y + BRK_PADDLE_H && brk_ball.y >= paddle_y) {
+        if(brk_ball.x >= brk_paddle.x - BRK_BALL_R && brk_ball.x <= brk_paddle.x + BRK_PADDLE_W + BRK_BALL_R) {
+            brk_ball.vy = abs(brk_ball.vy); // Force Up
+            // Add some english
+            brk_ball.vx += (brk_ball.x - (brk_paddle.x + BRK_PADDLE_W/2)) / 10;
+        }
+    }
+
+    // Bottom Wall (Death)
+    if(brk_ball.y <= 0) {
+        brk_lives--;
+        if(brk_lives <= 0) {
+            brk_game_over = 1;
+        } else {
+            // Reset Ball
+            brk_ball.x = brk_paddle.x + BRK_PADDLE_W/2;
+            brk_ball.y = 1000;
+            brk_ball.vx = 30;
+            brk_ball.vy = 30;
+        }
+    }
+
+    // Brick Collision
+    int brick_start_y = 3000;
+    
+    // Check if ball is in brick area
+    if(brk_ball.y >= brick_start_y && brk_ball.y < brick_start_y + (BRK_ROWS * BRK_BRICK_H)) {
+        int row = (brk_ball.y - brick_start_y) / BRK_BRICK_H;
+        int col = brk_ball.x / BRK_BRICK_W;
+        
+        if(row >= 0 && row < BRK_ROWS && col >= 0 && col < BRK_COLS) {
+            if(brk_bricks[row][col]) {
+                brk_bricks[row][col] = 0;
+                brk_ball.vy = -brk_ball.vy;
+                brk_score += 10;
+            }
         }
     }
 }
