@@ -703,9 +703,9 @@ void GuiTask(void const * argument)
                 int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 20, 20);
                 RestoreScroll(s1, "GAME OVER");
                 
-                char score_str[16];
-                sprintf(score_str, "SCORE: %d", game_score);
-                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
+                char score_str[32];
+                sprintf(score_str, "SCORE: %d   ", game_score); // Add spaces to ensure width > screen for scrolling
+                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 20, 20);
                 RestoreScroll(s2, score_str);
             }
         } else if(ui_state == UI_PLAYING) {
