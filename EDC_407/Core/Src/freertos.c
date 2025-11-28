@@ -39,7 +39,9 @@
 typedef enum {
     UI_MENU_MAIN,
     UI_MENU_MUSIC_LIST,
-    UI_PLAYING
+    UI_PLAYING,
+    UI_MENU_TEXT_LIST,
+    UI_TEXT_VIEWER
 } UI_State;
 /* USER CODE END PTD */
 
@@ -78,6 +80,12 @@ extern uint8_t Wave[];
 char music_files[MAX_MUSIC_FILES][MAX_FILENAME_LEN];
 int music_file_count = 0;
 char current_playing_file[MAX_FILENAME_LEN];
+
+// --- Text Viewer Variables ---
+#define MAX_TEXT_LINES 1000
+char *text_lines[MAX_TEXT_LINES];
+int total_text_lines = 0;
+int current_text_line = 0;
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId myTask02Handle;
@@ -89,6 +97,9 @@ void Scan_Music_Files(const char* path);
 void Play_Music(char* filename);
 void Play_Video(char* filename);
 void Stop_Music(void);
+void Scan_Text_Files(const char* path);
+void Open_Text_File(char* filename);
+
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void const * argument);
@@ -344,18 +355,19 @@ void GuiTask(void const * argument)
   const char *main_menu_items[] = {
       "MUSIC PLAYER",
       "VIDEO PLAYER",
+      "TEXT BROWSER",
       "SETTINGS",   
       "ABOUT",
       "EXIT"
   };
-  const int main_menu_count = 5;
+  const int main_menu_count = 6;
   
   // State Variables
   int menu_index = 0;
   int menu_scroll = 0;
   int last_menu_index = -1;
   int last_menu_scroll = -1;
-  int menu_mode = 0; // 0: Music, 1: Video
+  int menu_mode = 0; // 0: Music, 1: Video, 2: Text
   
   // UI Constants
   const int line_height = 500;
@@ -390,6 +402,18 @@ void GuiTask(void const * argument)
              if(new_vol < 0) new_vol = 0;
              volume = (uint16_t)new_vol;
         }
+    } else if(ui_state == UI_TEXT_VIEWER) {
+        // Text Scrolling
+        encoder_acc += delta;
+        if(abs(encoder_acc) >= 4) {
+            int steps = encoder_acc / 4;
+            current_text_line += steps;
+            encoder_acc -= steps * 4;
+            
+            if(current_text_line < 0) current_text_line = 0;
+            if(current_text_line > total_text_lines - visible_lines) current_text_line = total_text_lines - visible_lines;
+            if(current_text_line < 0) current_text_line = 0;
+        }
     } else {
         // Menu Navigation
         encoder_acc += delta;
@@ -398,7 +422,9 @@ void GuiTask(void const * argument)
             menu_index += steps;
             encoder_acc -= steps * 4;
             
-            int max_items = (ui_state == UI_MENU_MAIN) ? main_menu_count : music_file_count;
+            int max_items = 0;
+            if(ui_state == UI_MENU_MAIN) max_items = main_menu_count;
+            else if(ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST) max_items = music_file_count;
             
             if(menu_index < 0) menu_index = 0;
             if(menu_index >= max_items) menu_index = max_items - 1;
@@ -418,7 +444,7 @@ void GuiTask(void const * argument)
                      menu_mode = 0;
                      menu_index = 0;
                      menu_scroll = 0;
-                     last_menu_index = -1; // Force redraw
+                     last_menu_index = -1; 
                  } else if(menu_index == 1) { // Video Player
                      Scan_Music_Files("/video");
                      ui_state = UI_MENU_MUSIC_LIST;
@@ -426,9 +452,16 @@ void GuiTask(void const * argument)
                      menu_index = 0;
                      menu_scroll = 0;
                      last_menu_index = -1;
+                 } else if(menu_index == 2) { // Text Browser
+                     Scan_Text_Files("/text");
+                     ui_state = UI_MENU_TEXT_LIST;
+                     menu_mode = 2;
+                     menu_index = 0;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
                  }
              } else if(ui_state == UI_MENU_MUSIC_LIST) {
-                 if(menu_index == 0) { // Back "Back"
+                 if(menu_index == 0) { // Back
                      ui_state = UI_MENU_MAIN;
                      menu_index = 0;
                      menu_scroll = 0;
@@ -441,17 +474,45 @@ void GuiTask(void const * argument)
                      ui_state = UI_PLAYING;
                      last_menu_index = -1;
                  }
+             } else if(ui_state == UI_MENU_TEXT_LIST) {
+                 if(menu_index == 0) { // Back
+                     ui_state = UI_MENU_MAIN;
+                     menu_index = 0;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
+                 } else {
+                     // Open Text File
+                     Open_Text_File(music_files[menu_index]);
+                     ui_state = UI_TEXT_VIEWER;
+                     last_menu_index = -1; // Force redraw
+                 }
              } else if(ui_state == UI_PLAYING) {
                  Stop_Music();
                  ui_state = UI_MENU_MUSIC_LIST;
+                 last_menu_index = -1;
+             } else if(ui_state == UI_TEXT_VIEWER) {
+                 ui_state = UI_MENU_TEXT_LIST;
                  last_menu_index = -1;
              }
         }
     }
     
     // Render UI
-    if((menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING) && !(ui_state == UI_PLAYING && menu_mode == 1)) {
-        // Only clear if structure changes, but for now clear always for simplicity
+    // Check if redraw needed
+    int redraw = 0;
+    if(ui_state == UI_TEXT_VIEWER) {
+        static int last_text_line = -1;
+        if(current_text_line != last_text_line) {
+            redraw = 1;
+            last_text_line = current_text_line;
+        }
+    } else {
+        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING) {
+            redraw = 1;
+        }
+    }
+    
+    if(redraw && !(ui_state == UI_PLAYING && menu_mode == 1)) {
         DRAW_Clear();
         
         if(ui_state == UI_PLAYING) {
@@ -463,9 +524,21 @@ void GuiTask(void const * argument)
             DRAW_AddString(vol_str, 100, 100, 2000, 15, 15);
             
             DRAW_AddString("[PRESS TO STOP]", 100, 100, 1000, 10, 10);
+        } else if(ui_state == UI_TEXT_VIEWER) {
+            // Render Text Lines
+            for(int i=0; i<visible_lines; i++) {
+                int line_idx = current_text_line + i;
+                if(line_idx >= total_text_lines) break;
+                
+                int y_pos = start_y - (i * 600);
+                // Use larger font for text: 15% scale//调节字号
+                DRAW_AddString(text_lines[line_idx], 75, 100, y_pos, 15, 15);
+            }
         } else {
             // Menu Rendering
-            int count = (ui_state == UI_MENU_MAIN) ? main_menu_count : music_file_count;
+            int count = 0;
+            if(ui_state == UI_MENU_MAIN) count = main_menu_count;
+            else count = music_file_count;
             
             // Calculate Scroll
             if(menu_index < menu_scroll) menu_scroll = menu_index;
@@ -492,7 +565,7 @@ void GuiTask(void const * argument)
             }
         }
         
-        DRAW_AddRect(0, 0, 4095, 4095);
+        if(ui_state != UI_TEXT_VIEWER) DRAW_AddRect(0, 0, 4095, 4095);
         
         last_menu_index = menu_index;
         last_menu_scroll = menu_scroll;
@@ -658,5 +731,97 @@ void Stop_Music(void) {
     osDelay(10); // Wait for AudioTask to pause
     f_close(&fil);
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+}
+
+
+void Scan_Text_Files(const char* path) {
+    DIR dir;
+    FILINFO fno;
+    FRESULT res;
+    
+    // Reuse music_files array
+    memset(music_files, 0, sizeof(music_files));
+    music_file_count = 0;
+    
+    // Add "Back" option
+    strcpy(music_files[0], "Back");
+    music_file_count++;
+    
+    res = f_opendir(&dir, path);
+    if (res == FR_OK) {
+        for (;;) {
+            res = f_readdir(&dir, &fno);
+            if (res != FR_OK || fno.fname[0] == 0) break;
+            if (fno.fattrib & AM_DIR) continue;
+            
+            // Check extension .txt
+            if (strstr(fno.fname, ".txt") || strstr(fno.fname, ".TXT")) {
+                if (music_file_count < MAX_MUSIC_FILES) {
+                    strncpy(music_files[music_file_count], fno.fname, MAX_FILENAME_LEN - 1);
+                    music_files[music_file_count][MAX_FILENAME_LEN - 1] = '\0';
+                    music_file_count++;
+                }
+            }
+        }
+        f_closedir(&dir);
+    }
+}
+
+void Open_Text_File(char* filename) {
+    char path[64];
+    sprintf(path, "/text/%s", filename);
+    
+    FRESULT res = f_open(&fil, path, FA_READ);
+    if(res == FR_OK) {
+        UINT br;
+        // Read file with margin for expansion (Limit to 12KB)
+        f_read(&fil, SD_Wave_Buffer, 12000, &br);
+        SD_Wave_Buffer[br] = '\0'; // Null terminate
+        f_close(&fil);
+        
+        // --- Auto Word Wrap Pass ---
+        int col = 0;
+        uint32_t len = br;
+        for(int i=0; i<len; i++) {
+            if(SD_Wave_Buffer[i] == '\n') {
+                col = 0;
+            } else if(SD_Wave_Buffer[i] == '\r') {
+                // ignore
+            } else {
+                col++;
+                if(col >= 10) { // Max chars per line (10 chars for scale 15)
+                    // Insert newline
+                    if(len < SD_WAVE_MAX_LEN - 2) {
+                        // Shift data
+                        memmove(&SD_Wave_Buffer[i+1], &SD_Wave_Buffer[i], len - i + 1); // +1 for null terminator
+                        SD_Wave_Buffer[i] = '\n';
+                        len++;
+                        col = 0;
+                    } else {
+                        break; // Buffer full
+                    }
+                }
+            }
+        }
+        // ---------------------------
+        
+        // Parse lines
+        total_text_lines = 0;
+        current_text_line = 0;
+        
+        char *p = (char*)SD_Wave_Buffer;
+        text_lines[total_text_lines++] = p;
+        
+        while(*p && total_text_lines < MAX_TEXT_LINES) {
+            if(*p == '\n') {
+                *p = '\0'; // Replace newline with null
+                // Handle Windows \r\n
+                if(p > (char*)SD_Wave_Buffer && *(p-1) == '\r') *(p-1) = '\0';
+                
+                text_lines[total_text_lines++] = p + 1;
+            }
+            p++;
+        }
+    }
 }
 /* USER CODE END Application */
