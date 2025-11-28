@@ -397,7 +397,7 @@ void GuiTask(void const * argument)
     // Handle Volume in Playing State
     if(ui_state == UI_PLAYING) {
         if(delta != 0) {
-             int32_t new_vol = (int32_t)volume + (delta * 10);
+             int32_t new_vol = (int32_t)volume + (delta * 2);
              if(new_vol > 2000) new_vol = 2000;
              if(new_vol < 0) new_vol = 0;
              volume = (uint16_t)new_vol;

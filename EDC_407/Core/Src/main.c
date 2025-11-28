@@ -59,7 +59,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint16_t volume =1000;
+uint16_t volume =160;
 uint8_t pitch =60;
 uint32_t last_interrupt_time=0;
 uint32_t current_time=0;

@@ -60,6 +60,15 @@ void Error_Handler(void);
 #define KEY_UP_Pin GPIO_PIN_2
 #define KEY_UP_GPIO_Port GPIOE
 #define KEY_UP_EXTI_IRQn EXTI2_IRQn
+#define KEY_LEFT_Pin GPIO_PIN_3
+#define KEY_LEFT_GPIO_Port GPIOE
+#define KEY_LEFT_EXTI_IRQn EXTI3_IRQn
+#define KEY_DOWN_Pin GPIO_PIN_4
+#define KEY_DOWN_GPIO_Port GPIOE
+#define KEY_DOWN_EXTI_IRQn EXTI4_IRQn
+#define KEY_RIGHT_Pin GPIO_PIN_5
+#define KEY_RIGHT_GPIO_Port GPIOE
+#define KEY_RIGHT_EXTI_IRQn EXTI9_5_IRQn
 #define RS_Pin GPIO_PIN_13
 #define RS_GPIO_Port GPIOC
 #define RS_EXTI_IRQn EXTI15_10_IRQn
