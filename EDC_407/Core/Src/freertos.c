@@ -41,7 +41,10 @@ typedef enum {
     UI_MENU_MUSIC_LIST,
     UI_PLAYING,
     UI_MENU_TEXT_LIST,
-    UI_TEXT_VIEWER
+    UI_TEXT_VIEWER,
+    UI_MENU_GAME_LIST,
+    UI_GAME,
+    UI_DEBUG_INPUT
 } UI_State;
 /* USER CODE END PTD */
 
@@ -73,6 +76,7 @@ extern int scale;
 extern uint8_t func;
 extern uint8_t Music_Score[];
 extern uint8_t Wave[];
+extern volatile int8_t Game_Input_Dir;
 
 // Music Player Globals
 #define MAX_MUSIC_FILES 20
@@ -86,6 +90,22 @@ char current_playing_file[MAX_FILENAME_LEN];
 char *text_lines[MAX_TEXT_LINES];
 int total_text_lines = 0;
 int current_text_line = 0;
+
+// --- Snake Game Variables ---
+#define SNAKE_GRID_SIZE 20
+#define SNAKE_MAX_LEN 100
+typedef struct {
+    int8_t x;
+    int8_t y;
+} Point;
+Point snake_body[SNAKE_MAX_LEN];
+int snake_len = 3;
+Point snake_food;
+int snake_dir = 3; // 0:UP, 1:DOWN, 2:LEFT, 3:RIGHT
+int game_over = 0;
+uint32_t last_game_tick = 0;
+int game_score = 0;
+
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId myTask02Handle;
@@ -99,6 +119,8 @@ void Play_Video(char* filename);
 void Stop_Music(void);
 void Scan_Text_Files(const char* path);
 void Open_Text_File(char* filename);
+void Init_Snake_Game(void);
+void Update_Snake_Game(void);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -356,11 +378,20 @@ void GuiTask(void const * argument)
       "MUSIC PLAYER",
       "VIDEO PLAYER",
       "TEXT BROWSER",
+      "DEBUG INPUT",
+      "GAME",
       "SETTINGS",   
       "ABOUT",
       "EXIT"
   };
-  const int main_menu_count = 6;
+  const int main_menu_count = 8;
+
+  // Game Menu Items
+  const char *game_menu_items[] = {
+      "SNAKE",
+      "BACK"
+  };
+  const int game_menu_count = 2;
   
   // State Variables
   int menu_index = 0;
@@ -385,6 +416,10 @@ void GuiTask(void const * argument)
     // Update Drawing Animation
     if(!Video_Mode) {
         DRAW_Update();
+    }
+
+    if(ui_state == UI_GAME) {
+        Update_Snake_Game();
     }
 
     HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
@@ -459,6 +494,14 @@ void GuiTask(void const * argument)
                      menu_index = 0;
                      menu_scroll = 0;
                      last_menu_index = -1;
+                 } else if(menu_index == 3) { // Debug Input
+                     ui_state = UI_DEBUG_INPUT;
+                     last_menu_index = -1;
+                 } else if(menu_index == 4) { // Game Menu
+                     ui_state = UI_MENU_GAME_LIST;
+                     menu_index = 0;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
                  }
              } else if(ui_state == UI_MENU_MUSIC_LIST) {
                  if(menu_index == 0) { // Back
@@ -486,12 +529,30 @@ void GuiTask(void const * argument)
                      ui_state = UI_TEXT_VIEWER;
                      last_menu_index = -1; // Force redraw
                  }
+             } else if(ui_state == UI_MENU_GAME_LIST) {
+                 if(menu_index == 0) { // Snake
+                     Init_Snake_Game();
+                     ui_state = UI_GAME;
+                     last_menu_index = -1;
+                 } else { // Back
+                     ui_state = UI_MENU_MAIN;
+                     menu_index = 4; // Return to Game option
+                     menu_scroll = 0;
+                     last_menu_index = -1;
+                 }
              } else if(ui_state == UI_PLAYING) {
                  Stop_Music();
                  ui_state = UI_MENU_MUSIC_LIST;
                  last_menu_index = -1;
              } else if(ui_state == UI_TEXT_VIEWER) {
                  ui_state = UI_MENU_TEXT_LIST;
+                 last_menu_index = -1;
+             } else if(ui_state == UI_GAME) {
+                 ui_state = UI_MENU_GAME_LIST;
+                 menu_index = 0;
+                 last_menu_index = -1;
+             } else if(ui_state == UI_DEBUG_INPUT) {
+                 ui_state = UI_MENU_MAIN;
                  last_menu_index = -1;
              }
         }
@@ -507,7 +568,7 @@ void GuiTask(void const * argument)
             last_text_line = current_text_line;
         }
     } else {
-        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING) {
+        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST) {
             redraw = 1;
         }
     }
@@ -515,7 +576,63 @@ void GuiTask(void const * argument)
     if(redraw && !(ui_state == UI_PLAYING && menu_mode == 1)) {
         DRAW_Clear();
         
-        if(ui_state == UI_PLAYING) {
+        if(ui_state == UI_DEBUG_INPUT) {
+            DRAW_AddString("DEBUG INPUT", 100, 100, 3800, 15, 15);
+            
+            char buf[32];
+            
+            // Read Pins
+            // Note: Assuming Pull-Up, so Pressed = 0 (RESET), Released = 1 (SET)
+            // Or Pull-Down? Usually buttons are Pull-Up. Let's display the raw value.
+            
+            sprintf(buf, "UP(PE2): %d", HAL_GPIO_ReadPin(KEY_UP_GPIO_Port, KEY_UP_Pin));
+            DRAW_AddString(buf, 100, 100, 3200, 15, 15);
+            
+            sprintf(buf, "DOWN(PE4): %d", HAL_GPIO_ReadPin(KEY_DOWN_GPIO_Port, KEY_DOWN_Pin));
+            DRAW_AddString(buf, 100, 100, 2800, 15, 15);
+            
+            sprintf(buf, "LEFT(PE3): %d", HAL_GPIO_ReadPin(KEY_LEFT_GPIO_Port, KEY_LEFT_Pin));
+            DRAW_AddString(buf, 100, 100, 2400, 15, 15);
+            
+            sprintf(buf, "RIGHT(PE5): %d", HAL_GPIO_ReadPin(KEY_RIGHT_GPIO_Port, KEY_RIGHT_Pin));
+            DRAW_AddString(buf, 100, 100, 2000, 15, 15);
+            
+            sprintf(buf, "GAME DIR: %d", Game_Input_Dir);
+            DRAW_AddString(buf, 100, 100, 1400, 15, 15);
+            
+            DRAW_AddString("[PRESS ENC TO EXIT]", 100, 100, 800, 10, 10);
+            
+        } else if(ui_state == UI_GAME) {
+            // Draw Snake Game
+            // Draw Border
+            DRAW_AddRect(0, 0, 4095, 4095);
+            
+            // Draw Snake
+            int cell_size = 4096 / SNAKE_GRID_SIZE;
+            for(int i=0; i<snake_len; i++) {
+                int x = snake_body[i].x * cell_size + (cell_size/2);
+                int y = snake_body[i].y * cell_size + (cell_size/2);
+                // Draw a small square or circle for each segment
+                // Using AddRect for simplicity, centered
+                int half_size = (cell_size / 2) - 10;
+                DRAW_AddRect(x - half_size, y - half_size, 2*half_size, 2*half_size);
+            }
+            
+            // Draw Food
+            int fx = snake_food.x * cell_size + (cell_size/2);
+            int fy = snake_food.y * cell_size + (cell_size/2);
+            // Draw X for food
+            int f_half = (cell_size / 2) - 20;
+            DRAW_AddLine(fx - f_half, fy - f_half, fx + f_half, fy + f_half);
+            DRAW_AddLine(fx - f_half, fy + f_half, fx + f_half, fy - f_half);
+            
+            if(game_over) {
+                DRAW_AddString("GAME OVER", 100, 1000, 2200, 20, 20);
+                char score_str[16];
+                sprintf(score_str, "SCORE: %d", game_score);
+                DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
+            }
+        } else if(ui_state == UI_PLAYING) {
             DRAW_AddString("PLAYING:", 100, 100, 3500, 15, 15);
             DRAW_AddString(current_playing_file, 100, 100, 3000, 15, 15);
             
@@ -537,8 +654,18 @@ void GuiTask(void const * argument)
         } else {
             // Menu Rendering
             int count = 0;
-            if(ui_state == UI_MENU_MAIN) count = main_menu_count;
-            else count = music_file_count;
+            const char **items = NULL;
+            
+            if(ui_state == UI_MENU_MAIN) {
+                count = main_menu_count;
+                items = main_menu_items;
+            } else if(ui_state == UI_MENU_GAME_LIST) {
+                count = game_menu_count;
+                items = game_menu_items;
+            } else {
+                count = music_file_count;
+                items = (const char**)music_files;
+            }
             
             // Calculate Scroll
             if(menu_index < menu_scroll) menu_scroll = menu_index;
@@ -555,11 +682,11 @@ void GuiTask(void const * argument)
                     DRAW_AddString(">", 100, 100, y_pos, 15, 15);
                     
                     // Scrolling Text
-                    const char *text = (ui_state == UI_MENU_MAIN) ? main_menu_items[item_idx] : music_files[item_idx];
+                    const char *text = items[item_idx];
                     DRAW_AddString(text, 100, 400, y_pos, 15, 15);
                 } else {
                     // Normal Text
-                    const char *text = (ui_state == UI_MENU_MAIN) ? main_menu_items[item_idx] : music_files[item_idx];
+                    const char *text = items[item_idx];
                     DRAW_AddString(text, 100, 400, y_pos, 15, 15);
                 }
             }
@@ -822,6 +949,74 @@ void Open_Text_File(char* filename) {
                 text_lines[total_text_lines++] = p + 1;
             }
             p++;
+        }
+    }
+}
+
+void Init_Snake_Game(void) {
+    snake_len = 3;
+    snake_body[0].x = 10; snake_body[0].y = 10;
+    snake_body[1].x = 10; snake_body[1].y = 9;
+    snake_body[2].x = 10; snake_body[2].y = 8;
+    
+    snake_dir = 0; // UP
+    Game_Input_Dir = 0;
+    
+    // Random Food
+    snake_food.x = rand() % SNAKE_GRID_SIZE;
+    snake_food.y = rand() % SNAKE_GRID_SIZE;
+    
+    game_over = 0;
+    game_score = 0;
+    last_game_tick = HAL_GetTick();
+}
+
+void Update_Snake_Game(void) {
+    if(game_over) return;
+    
+    // Update Direction from Input
+    // Prevent 180 degree turns
+    if(Game_Input_Dir == 0 && snake_dir != 1) snake_dir = 0;
+    if(Game_Input_Dir == 1 && snake_dir != 0) snake_dir = 1;
+    if(Game_Input_Dir == 2 && snake_dir != 3) snake_dir = 2;
+    if(Game_Input_Dir == 3 && snake_dir != 2) snake_dir = 3;
+    
+    if(HAL_GetTick() - last_game_tick > 200) { // 200ms speed
+        last_game_tick = HAL_GetTick();
+        
+        // Move Body
+        for(int i=snake_len-1; i>0; i--) {
+            snake_body[i] = snake_body[i-1];
+        }
+        
+        // Move Head
+        if(snake_dir == 0) snake_body[0].y++;
+        if(snake_dir == 1) snake_body[0].y--;
+        if(snake_dir == 2) snake_body[0].x--;
+        if(snake_dir == 3) snake_body[0].x++;
+        
+        // Check Wall Collision
+        if(snake_body[0].x < 0 || snake_body[0].x >= SNAKE_GRID_SIZE ||
+           snake_body[0].y < 0 || snake_body[0].y >= SNAKE_GRID_SIZE) {
+            game_over = 1;
+        }
+        
+        // Check Self Collision
+        for(int i=1; i<snake_len; i++) {
+            if(snake_body[0].x == snake_body[i].x && snake_body[0].y == snake_body[i].y) {
+                game_over = 1;
+            }
+        }
+        
+        // Check Food
+        if(snake_body[0].x == snake_food.x && snake_body[0].y == snake_food.y) {
+            if(snake_len < SNAKE_MAX_LEN) {
+                snake_len++;
+                game_score += 10;
+            }
+            // New Food
+            snake_food.x = rand() % SNAKE_GRID_SIZE;
+            snake_food.y = rand() % SNAKE_GRID_SIZE;
         }
     }
 }

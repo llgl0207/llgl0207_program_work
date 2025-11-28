@@ -67,6 +67,7 @@ uint8_t func=0;
 static int freq=500;
 static int count_S=0;
 uint8_t percentage=5;
+volatile int8_t Game_Input_Dir = -1; // 0:UP, 1:DOWN, 2:LEFT, 3:RIGHT
 
 // --- SD Waveform Variables ---
 #define SD_WAVE_MAX_LEN 16384 // 16KB Dedicated Audio Buffer
@@ -430,61 +431,38 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  // 1. 判断是哪个引脚触发了中断
-  // 因为你配置的是PB2，所以这里判断GPIO_PIN_2
+  uint32_t current_time = HAL_GetTick();
+  if(current_time - last_interrupt_time < 100) return; // Debounce
+  last_interrupt_time = current_time;
+
   if(GPIO_Pin == RS_Pin)
   {
-		 uint32_t current_time = HAL_GetTick();//获取当前时间用于按键消抖
-
-
-    if(current_time - last_interrupt_time > 100)//判断当前时间与上一次中断触发时间的间隔是否大于50ms，用于消抖
-    {
-			//=======================================EXTI=========================================
-      //there are codes which will be activated when the EXTI happened.
-				//HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_13);
-				func++;
-				if(func==3)func=0;
-				if(func==2)count_S=0;
-			}
-    }
-	if(GPIO_Pin == KEY_UP_Pin)
+      func++;
+      if(func==3)func=0;
+      if(func==2)count_S=0;
+  }
+  else if(GPIO_Pin == KEY_UP_Pin)
   {
-		 uint32_t current_time = HAL_GetTick();//获取当前时间用于按键消抖
-
-
-    if(current_time - last_interrupt_time > 100)//判断当前时间与上一次中断触发时间的间隔是否大于50ms，用于消抖
-    {
-			//=======================================EXTI=========================================
-      //there are codes which will be activated when the EXTI happened.
-				//HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_13);
-				percentage+=1;
-			if(percentage>10)percentage=0;
-			for(int i=0;i<10;i++)
-				{
-					Wave[i]=0;
-				}
-			for(int i=0;i<percentage;i++){
-				Wave[i]=90;
-				}
-			}
-    }
-    last_interrupt_time = current_time;//更新上一次中断触发时间
-		
-    // 2. 在这里写你的中断处理代码
-    
-    // --- 示例：翻转一个LED ---
-    // 假设你在PC13上接了一个LED，并且在CubeMX里配置好了
-     
-
-    // --- 示例：发送一个串口信息 ---
-    // 注意：中断函数里要避免使用printf等耗时操作，可以用快速的非阻塞方式
-    // printf("PB2 Interrupt Triggered!\r\n"); // 不推荐在中断里用
-
-    // --- 示例：设置一个全局标志位 ---
-    // 定义一个全局变量 volatile bool pb2_flag = false;
-    // 在这里设置 pb2_flag = true;
-    // 然后在main循环里检查这个标志位来处理事件
-  
+      Game_Input_Dir = 0; // UP
+      
+      // Original Logic
+      percentage+=1;
+      if(percentage>10)percentage=0;
+      for(int i=0;i<10;i++) Wave[i]=0;
+      for(int i=0;i<percentage;i++) Wave[i]=90;
+  }
+  else if(GPIO_Pin == KEY_DOWN_Pin)
+  {
+      Game_Input_Dir = 1; // DOWN
+  }
+  else if(GPIO_Pin == KEY_LEFT_Pin)
+  {
+      Game_Input_Dir = 2; // LEFT
+  }
+  else if(GPIO_Pin == KEY_RIGHT_Pin)
+  {
+      Game_Input_Dir = 3; // RIGHT
+  }
 }
 /* HAL_TIM_PeriodElapsedCallback for TIM3 moved to the bottom of the file */
 
