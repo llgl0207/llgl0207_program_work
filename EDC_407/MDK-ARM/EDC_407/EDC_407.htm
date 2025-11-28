@@ -3,7 +3,7 @@
 <title>Static Call Graph - [EDC_407\EDC_407.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image EDC_407\EDC_407.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060750: Last Updated: Fri Nov 28 22:16:40 2025
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060750: Last Updated: Fri Nov 28 23:52:02 2025
 <BR><P>
 <H3>Maximum Stack Usage =       1256 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -1014,7 +1014,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[71]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;GuiTask
 </UL>
 
-<P><STRONG><a name="[c0]"></a>DRAW_AddString</STRONG> (Thumb, 462 bytes, Stack size 64 bytes, draw.o(i.DRAW_AddString))
+<P><STRONG><a name="[c0]"></a>DRAW_AddString</STRONG> (Thumb, 470 bytes, Stack size 64 bytes, draw.o(i.DRAW_AddString))
 <BR><BR>[Stack]<UL><LI>Max Depth = 84<LI>Call Chain = DRAW_AddString &rArr; compute_pattern_minmax_x
 </UL>
 <BR>[Calls]<UL><LI><a href="#[c1]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_GetTick
@@ -1051,7 +1051,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[88]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[c5]"></a>DRAW_Render</STRONG> (Thumb, 2200 bytes, Stack size 160 bytes, draw.o(i.DRAW_Render))
+<P><STRONG><a name="[c5]"></a>DRAW_Render</STRONG> (Thumb, 2208 bytes, Stack size 160 bytes, draw.o(i.DRAW_Render))
 <BR><BR>[Stack]<UL><LI>Max Depth = 344<LI>Call Chain = DRAW_Render &rArr; __hardfp_sin &rArr; __ieee754_rem_pio2 &rArr; __aeabi_dsub
 </UL>
 <BR>[Calls]<UL><LI><a href="#[d1]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_DAC_Stop_DMA
@@ -1180,7 +1180,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[dc]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FATFS_LinkDriver
 </UL>
 
-<P><STRONG><a name="[71]"></a>GuiTask</STRONG> (Thumb, 3032 bytes, Stack size 144 bytes, freertos.o(i.GuiTask))
+<P><STRONG><a name="[71]"></a>GuiTask</STRONG> (Thumb, 3244 bytes, Stack size 144 bytes, freertos.o(i.GuiTask))
 <BR><BR>[Stack]<UL><LI>Max Depth = 1256 + Unknown Stack Size
 <LI>Call Chain = GuiTask &rArr; Scan_Text_Files &rArr; f_opendir &rArr; follow_path &rArr; dir_find &rArr; dir_next &rArr; create_chain &rArr; put_fat &rArr; move_window &rArr; sync_window &rArr; disk_write
 </UL>
@@ -1912,7 +1912,7 @@ Global Symbols
 <P><STRONG><a name="[5]"></a>HardFault_Handler</STRONG> (Thumb, 4 bytes, Stack size 0 bytes, stm32f4xx_it.o(i.HardFault_Handler))
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32f407xx.o(RESET)
 </UL>
-<P><STRONG><a name="[e7]"></a>Init_Breakout_Game</STRONG> (Thumb, 78 bytes, Stack size 0 bytes, freertos.o(i.Init_Breakout_Game))
+<P><STRONG><a name="[e7]"></a>Init_Breakout_Game</STRONG> (Thumb, 94 bytes, Stack size 0 bytes, freertos.o(i.Init_Breakout_Game))
 <BR><BR>[Called By]<UL><LI><a href="#[71]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;GuiTask
 </UL>
 
@@ -2546,8 +2546,8 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[13c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_TIM_PWM_ConfigChannel
 </UL>
 
-<P><STRONG><a name="[df]"></a>Update_Breakout_Game</STRONG> (Thumb, 428 bytes, Stack size 16 bytes, freertos.o(i.Update_Breakout_Game))
-<BR><BR>[Stack]<UL><LI>Max Depth = 16<LI>Call Chain = Update_Breakout_Game
+<P><STRONG><a name="[df]"></a>Update_Breakout_Game</STRONG> (Thumb, 472 bytes, Stack size 20 bytes, freertos.o(i.Update_Breakout_Game))
+<BR><BR>[Stack]<UL><LI>Max Depth = 20<LI>Call Chain = Update_Breakout_Game
 </UL>
 <BR>[Called By]<UL><LI><a href="#[71]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;GuiTask
 </UL>

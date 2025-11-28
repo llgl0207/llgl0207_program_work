@@ -132,6 +132,7 @@ BrkPaddle brk_paddle;
 int brk_score = 0;
 int brk_lives = 3;
 int brk_game_over = 0;
+int brk_brick_count = 0;
 
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
@@ -635,11 +636,14 @@ void GuiTask(void const * argument)
     // Check if redraw needed
     int redraw = 0;
     
+    /* Blink Disabled
     if(HAL_GetTick() - last_blink_time > 500) {
         blink_state = !blink_state;
         last_blink_time = HAL_GetTick();
         redraw = 1;
     }
+    */
+    blink_state = 1;
 
     if(ui_state == UI_TEXT_VIEWER) {
         static int last_text_line = -1;
@@ -660,7 +664,8 @@ void GuiTask(void const * argument)
         saved_scroll_count = 0;
         
         if((ui_state == UI_GAME && game_over) || (ui_state == UI_BREAKOUT && brk_game_over)) {
-            SaveScroll("GAME OVER");
+            if(ui_state == UI_BREAKOUT && brk_game_over == 2) SaveScroll("YOU WIN");
+            else SaveScroll("GAME OVER");
             char s[32]; 
             if(ui_state == UI_GAME) sprintf(s, "SCORE: %d", game_score);
             else sprintf(s, "SCORE: %d", brk_score);
@@ -741,12 +746,12 @@ void GuiTask(void const * argument)
             DRAW_AddLine(fx - f_half, fy + f_half, fx + f_half, fy - f_half);
             
             if(game_over) {
-                int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 20, 20);
+                int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 15, 15);
                 RestoreScroll(s1, "GAME OVER");
                 
                 char score_str[32];
                 sprintf(score_str, "SCORE: %d   ", game_score); // Add spaces to ensure width > screen for scrolling
-                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 20, 20);
+                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
                 RestoreScroll(s2, score_str);
             }
         } else if(ui_state == UI_BREAKOUT) {
@@ -755,7 +760,7 @@ void GuiTask(void const * argument)
             
             // Draw Paddle
             int py = 200;
-            DRAW_AddRect(brk_paddle.x, py, brk_paddle.x + BRK_PADDLE_W, py + BRK_PADDLE_H);
+            DRAW_AddRect(brk_paddle.x, py, BRK_PADDLE_W, BRK_PADDLE_H);
             
             // Draw Ball
             DRAW_AddCircle(brk_ball.x, brk_ball.y, BRK_BALL_R);
@@ -767,19 +772,45 @@ void GuiTask(void const * argument)
                     if(brk_bricks[r][c]) {
                         int bx = c * BRK_BRICK_W;
                         int by = brick_start_y + (r * BRK_BRICK_H);
-                        DRAW_AddRect(bx + 10, by + 10, bx + BRK_BRICK_W - 10, by + BRK_BRICK_H - 10);
+                        int bw = BRK_BRICK_W;
+                        int bh = BRK_BRICK_H;
+                        
+                        // Bottom Edge
+                        if(r == 0 || !brk_bricks[r-1][c]) {
+                            DRAW_AddLine(bx, by, bx + bw, by);
+                        }
+                        
+                        // Top Edge
+                        if(r == BRK_ROWS-1 || !brk_bricks[r+1][c]) {
+                            DRAW_AddLine(bx, by + bh, bx + bw, by + bh);
+                        }
+                        
+                        // Left Edge
+                        if(c == 0 || !brk_bricks[r][c-1]) {
+                            DRAW_AddLine(bx, by, bx, by + bh);
+                        }
+                        
+                        // Right Edge
+                        if(c == BRK_COLS-1 || !brk_bricks[r][c+1]) {
+                            DRAW_AddLine(bx + bw, by, bx + bw, by + bh);
+                        }
                     }
                 }
             }
             
             // Draw Score/Lives
             if(brk_game_over) {
-                int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 20, 20);
-                RestoreScroll(s1, "GAME OVER");
+                if(brk_game_over == 2) {
+                    int16_t s1 = DRAW_AddString("YOU WIN", 100, 1000, 2200, 15, 15);
+                    RestoreScroll(s1, "YOU WIN");
+                } else {
+                    int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 15, 15);
+                    RestoreScroll(s1, "GAME OVER");
+                }
                 
                 char score_str[32];
                 sprintf(score_str, "SCORE: %d   ", brk_score);
-                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 20, 20);
+                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
                 RestoreScroll(s2, score_str);
             } else {
                 char lives_str[16];
@@ -809,6 +840,7 @@ void GuiTask(void const * argument)
             // Menu Rendering
             int count = 0;
             const char **items = NULL;
+            char (*file_items)[MAX_FILENAME_LEN] = NULL;
             
             if(ui_state == UI_MENU_MAIN) {
                 count = main_menu_count;
@@ -818,7 +850,7 @@ void GuiTask(void const * argument)
                 items = game_menu_items;
             } else {
                 count = music_file_count;
-                items = (const char**)music_files;
+                file_items = music_files;
             }
             
             // Calculate Scroll
@@ -831,17 +863,19 @@ void GuiTask(void const * argument)
                 
                 int y_pos = start_y - (i * line_height);
                 
+                const char *text;
+                if(items) text = items[item_idx];
+                else text = file_items[item_idx];
+                
                 // Draw Cursor
                 if(item_idx == menu_index) {
                     if(blink_state) DRAW_AddString(">", 100, 100, y_pos, 15, 15);
                     
                     // Scrolling Text
-                    const char *text = items[item_idx];
                     int16_t slot = DRAW_AddString(text, 100, 400, y_pos, 15, 15);
                     RestoreScroll(slot, text);
                 } else {
                     // Normal Text
-                    const char *text = items[item_idx];
                     int16_t slot = DRAW_AddString(text, 100, 400, y_pos, 15, 15);
                     RestoreScroll(slot, text);
                 }
@@ -1190,9 +1224,11 @@ void Init_Breakout_Game(void) {
     brk_ball.vy = 30;
 
     // Reset Bricks
+    brk_brick_count = 0;
     for(int r=0; r<BRK_ROWS; r++) {
         for(int c=0; c<BRK_COLS; c++) {
             brk_bricks[r][c] = 1;
+            brk_brick_count++;
         }
     }
 
@@ -1205,7 +1241,7 @@ void Update_Breakout_Game(int16_t encoder_delta) {
     if(brk_game_over) return;
 
     // Update Paddle
-    brk_paddle.x += encoder_delta * 200; // Sensitivity
+    brk_paddle.x += encoder_delta * 100; // Sensitivity
     if(brk_paddle.x < 0) brk_paddle.x = 0;
     if(brk_paddle.x > 4096 - BRK_PADDLE_W) brk_paddle.x = 4096 - BRK_PADDLE_W;
 
@@ -1231,12 +1267,25 @@ void Update_Breakout_Game(int16_t encoder_delta) {
 
     // Paddle Collision (Bottom)
     int paddle_y = 200;
+    int paddle_top = paddle_y + BRK_PADDLE_H;
     
-    if(brk_ball.y <= paddle_y + BRK_PADDLE_H && brk_ball.y >= paddle_y) {
-        if(brk_ball.x >= brk_paddle.x - BRK_BALL_R && brk_ball.x <= brk_paddle.x + BRK_PADDLE_W + BRK_BALL_R) {
-            brk_ball.vy = abs(brk_ball.vy); // Force Up
-            // Add some english
-            brk_ball.vx += (brk_ball.x - (brk_paddle.x + BRK_PADDLE_W/2)) / 10;
+    // Only check collision if moving DOWN
+    if(brk_ball.vy < 0) {
+        // Expanded collision box for anti-tunneling
+        // Check if ball is below the top of the paddle (plus radius)
+        // And above a reasonable "too late" threshold (e.g. 50) to prevent catching balls that are already dead
+        if(brk_ball.y <= paddle_top + BRK_BALL_R && brk_ball.y >= 50) {
+            // Check X range
+            if(brk_ball.x >= brk_paddle.x - BRK_BALL_R && brk_ball.x <= brk_paddle.x + BRK_PADDLE_W + BRK_BALL_R) {
+                // Hit
+                brk_ball.vy = abs(brk_ball.vy); // Force Up
+                
+                // Anti-Tunneling: Push ball to surface
+                brk_ball.y = paddle_top + BRK_BALL_R + 1;
+                
+                // Add some english
+                brk_ball.vx += (brk_ball.x - (brk_paddle.x + BRK_PADDLE_W/2)) / 10;
+            }
         }
     }
 
@@ -1267,6 +1316,8 @@ void Update_Breakout_Game(int16_t encoder_delta) {
                 brk_bricks[row][col] = 0;
                 brk_ball.vy = -brk_ball.vy;
                 brk_score += 10;
+                brk_brick_count--;
+                if(brk_brick_count <= 0) brk_game_over = 2; // Win
             }
         }
     }
