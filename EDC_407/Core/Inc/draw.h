@@ -21,7 +21,19 @@ typedef enum {
     DRAW_TYPE_CIRCLE
 } DrawType;
 
+typedef enum {
+    DRAW_MODE_DMA = 0,
+    DRAW_MODE_CPU
+} DrawMode;
+
 void DRAW_Init(uint32_t interval_ms);
+void DRAW_SetMode(DrawMode mode);
+void DRAW_SetCPUDelay(uint32_t delay);
+uint32_t DRAW_GetCPUDelay(void);
+void DRAW_SetCPUJumpDwell(uint32_t dwell);
+uint32_t DRAW_GetCPUJumpDwell(void);
+void DRAW_SetDrawDensity(uint32_t density);
+uint32_t DRAW_GetDrawDensity(void);
 void DRAW_SetLetter(char c);
 void DRAW_SetScale(uint16_t scale_x_percent, uint16_t scale_y_percent);
 void DRAW_SetOffset(int16_t offset_x, int16_t offset_y);

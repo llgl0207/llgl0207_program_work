@@ -332,7 +332,260 @@ void DRAW_Update(void){
     }
 }
 
+static DrawMode current_draw_mode = DRAW_MODE_DMA;
+static uint32_t cpu_draw_delay = 10; // Tuning parameter for CPU drawing speed
+static uint32_t cpu_jump_dwell = 0; // Tuning parameter for CPU jump wait time
+static uint32_t draw_density = 100; // 100 = 1.0x (Normal), 200 = 2.0x (Slower/Brighter), 50 = 0.5x (Faster)
+
+void DRAW_SetCPUDelay(uint32_t delay){
+    cpu_draw_delay = delay;
+}
+
+uint32_t DRAW_GetCPUDelay(void){
+    return cpu_draw_delay;
+}
+
+void DRAW_SetCPUJumpDwell(uint32_t dwell){
+    cpu_jump_dwell = dwell;
+}
+
+uint32_t DRAW_GetCPUJumpDwell(void){
+    return cpu_jump_dwell;
+}
+
+void DRAW_SetDrawDensity(uint32_t density){
+    if(density < 1) density = 1;
+    draw_density = density;
+}
+
+uint32_t DRAW_GetDrawDensity(void){
+    return draw_density;
+}
+
+void DRAW_SetMode(DrawMode mode){
+    current_draw_mode = mode;
+    if(mode == DRAW_MODE_CPU){
+        // Stop DMA if switching to CPU
+        HAL_DAC_Stop_DMA(&hdac, DAC_CHANNEL_1);
+        HAL_DAC_Stop_DMA(&hdac, DAC_CHANNEL_2);
+        HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+        HAL_DAC_Start(&hdac, DAC_CHANNEL_2);
+    }
+}
+
+static void DRAW_Render_CPU(void){
+    // Iterate objects and draw directly to DAC
+    for(int i=0; i<MAX_DRAW_OBJS; i++){
+        if(!draw_pool[i].active) continue;
+        
+        if(draw_pool[i].type == DRAW_TYPE_TEXT)
+        {
+            int32_t cursor_x = draw_pool[i].data.text_data.x;
+            int32_t cursor_y = draw_pool[i].data.text_data.y;
+            uint16_t sx = draw_pool[i].data.text_data.sx;
+            uint16_t sy = draw_pool[i].data.text_data.sy;
+            int32_t scroll = draw_pool[i].data.text_data.scroll_offset;
+            
+            for(int c=0; c<MAX_STR_LEN; c++){
+                char ch = draw_pool[i].data.text_data.text[c];
+                if(ch == 0) break;
+                if(ch == ' '){
+                    cursor_x += (2000 * (int32_t)sx) / 100 + draw_pool[i].data.text_data.spacing;
+                    continue;
+                }
+                
+                if(set_pattern_by_char(ch)){
+                    int32_t minx, maxx;
+                    compute_pattern_minmax_x(current_pattern, current_pattern_length, &minx, &maxx);
+                    
+                    int32_t pre_scale = 1;
+                    if((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')){
+                        pre_scale = 512;
+                    }
+                    
+                    minx *= pre_scale;
+                    maxx *= pre_scale;
+                    
+                    int32_t char_w = ((maxx - minx) * (int32_t)sx) / 100;
+                    int32_t draw_x = cursor_x - scroll;
+                    
+                    if(draw_x + char_w < 0) {
+                            cursor_x += char_w + draw_pool[i].data.text_data.spacing;
+                            continue; 
+                    }
+                    if(draw_x > 4096) {
+                            break; 
+                    }
+
+                    for(int l=0; l<current_pattern_length; l++){
+                        int32_t x0 = current_pattern[l].x0 * pre_scale;
+                        int32_t y0 = current_pattern[l].y0 * pre_scale;
+                        int32_t x1 = current_pattern[l].x1 * pre_scale;
+                        int32_t y1 = current_pattern[l].y1 * pre_scale;
+                        
+                        int32_t tx0 = (x0 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100 - scroll;
+                        int32_t ty0 = (y0 * (int32_t)sy) / 100 + cursor_y;
+                        int32_t tx1 = (x1 * (int32_t)sx) / 100 + cursor_x - (minx * (int32_t)sx) / 100 - scroll;
+                        int32_t ty1 = (y1 * (int32_t)sy) / 100 + cursor_y;
+                        
+                        // Move to start point and wait (Jump)
+                        if(tx0 < 0) tx0 = 0; if(tx0 > 4095) tx0 = 4095;
+                        if(ty0 < 0) ty0 = 0; if(ty0 > 4095) ty0 = 4095;
+                        
+                        int32_t dx = tx1 - tx0;
+                        int32_t dy = ty1 - ty0;
+                        
+                        // Use higher resolution for CPU drawing to make it smooth
+                        // Density Control: steps = distance * (density / 100)
+                        int steps = (int)(sqrtf((float)dx*dx + (float)dy*dy) * (float)draw_density / 100.0f); 
+                        if(steps < 2) steps = 2;
+
+                        // Direct Register Access for Speed
+                        hdac.Instance->DHR12RD = ((uint32_t)ty0 << 16) | (uint32_t)tx0;
+                        
+                        // Dwell at start point to allow beam to settle (hide jump line)
+                        if(cpu_jump_dwell > 0) {
+                            for(volatile int w=0; w<cpu_jump_dwell; w++);
+                        }
+                        
+                        for(int s=1; s<=steps; s++){
+                            int32_t px = tx0 + (dx * s) / steps;
+                            int32_t py = ty0 + (dy * s) / steps;
+                            
+                            if(px < 0) px = 0; if(px > 4095) px = 4095;
+                            if(py < 0) py = 0; if(py > 4095) py = 4095;
+                            
+                            hdac.Instance->DHR12RD = ((uint32_t)py << 16) | (uint32_t)px;
+                            
+                            // Delay for drawing speed
+                            if(cpu_draw_delay > 0) {
+                                for(volatile int w=0; w<cpu_draw_delay; w++);
+                            }
+                        }
+                    }
+                    cursor_x += char_w + draw_pool[i].data.text_data.spacing;
+                }
+            }
+        }
+        else if(draw_pool[i].type == DRAW_TYPE_LINE)
+        {
+            int32_t x0 = draw_pool[i].data.line_data.x0;
+            int32_t y0 = draw_pool[i].data.line_data.y0;
+            int32_t x1 = draw_pool[i].data.line_data.x1;
+            int32_t y1 = draw_pool[i].data.line_data.y1;
+            
+            int32_t dx = x1 - x0;
+            int32_t dy = y1 - y0;
+            int steps = (int)(sqrtf((float)dx*dx + (float)dy*dy) * (float)draw_density / 100.0f);
+            if(steps < 2) steps = 2;
+
+            hdac.Instance->DHR12RD = ((uint32_t)y0 << 16) | (uint32_t)x0;
+            if(cpu_jump_dwell > 0) {
+                for(volatile int w=0; w<cpu_jump_dwell; w++);
+            }
+            
+            for(int s=1; s<=steps; s++){
+                int32_t px = x0 + (dx * s) / steps;
+                int32_t py = y0 + (dy * s) / steps;
+                if(px > 4095) px = 4095; if(py > 4095) py = 4095;
+                hdac.Instance->DHR12RD = ((uint32_t)py << 16) | (uint32_t)px;
+                if(cpu_draw_delay > 0) {
+                    for(volatile int w=0; w<cpu_draw_delay; w++);
+                }
+            }
+        }
+        else if(draw_pool[i].type == DRAW_TYPE_RECT)
+        {
+            int32_t x = draw_pool[i].data.rect_data.x;
+            int32_t y = draw_pool[i].data.rect_data.y;
+            int32_t w = draw_pool[i].data.rect_data.w;
+            int32_t h = draw_pool[i].data.rect_data.h;
+            
+            int32_t pts[5][2] = { {x,y}, {x+w,y}, {x+w,y+h}, {x,y+h}, {x,y} };
+            
+            // Move to start
+            int32_t dx_init = pts[1][0] - pts[0][0];
+            int32_t dy_init = pts[1][1] - pts[0][1];
+            // Pre-calc first step to avoid delay at start
+            int steps_init = (int)(sqrtf((float)dx_init*dx_init + (float)dy_init*dy_init) * (float)draw_density / 100.0f);
+            if(steps_init < 2) steps_init = 2;
+            
+            hdac.Instance->DHR12RD = ((uint32_t)y << 16) | (uint32_t)x;
+            if(cpu_jump_dwell > 0) {
+                for(volatile int w=0; w<cpu_jump_dwell; w++);
+            }
+
+            for(int l=0; l<4; l++){
+                int32_t x0 = pts[l][0];
+                int32_t y0 = pts[l][1];
+                int32_t x1 = pts[l+1][0];
+                int32_t y1 = pts[l+1][1];
+                
+                int32_t dx = x1 - x0;
+                int32_t dy = y1 - y0;
+                
+                int steps;
+                if(l==0) steps = steps_init;
+                else {
+                    steps = (int)(sqrtf((float)dx*dx + (float)dy*dy) * (float)draw_density / 100.0f);
+                    if(steps < 2) steps = 2;
+                }
+                
+                // If not first line, we are already at x0,y0.
+                // But for consistency and to handle corner dwell if needed (not implemented), we just draw.
+                // Actually, for rect, we are already at x0,y0 from previous iteration end.
+                // So we don't need to jump.
+                
+                for(int s=1; s<=steps; s++){
+                    int32_t px = x0 + (dx * s) / steps;
+                    int32_t py = y0 + (dy * s) / steps;
+                    if(px > 4095) px = 4095; if(py > 4095) py = 4095;
+                    hdac.Instance->DHR12RD = ((uint32_t)py << 16) | (uint32_t)px;
+                    if(cpu_draw_delay > 0) {
+                        for(volatile int w=0; w<cpu_draw_delay; w++);
+                    }
+                }
+            }
+        }
+        else if(draw_pool[i].type == DRAW_TYPE_CIRCLE)
+        {
+            int32_t cx = draw_pool[i].data.circle_data.x;
+            int32_t cy = draw_pool[i].data.circle_data.y;
+            int32_t r = draw_pool[i].data.circle_data.r;
+            
+            int steps = (int)(6.28f * r * (float)draw_density / 100.0f); 
+            if(steps < 10) steps = 10;
+            
+            // Move to start
+            int32_t sx = cx + r;
+            int32_t sy = cy;
+            if(sx > 4095) sx = 4095;
+            
+            hdac.Instance->DHR12RD = ((uint32_t)sy << 16) | (uint32_t)sx;
+            if(cpu_jump_dwell > 0) {
+                for(volatile int w=0; w<cpu_jump_dwell; w++);
+            }
+            
+            for(int s=1; s<=steps; s++){
+                float angle = (float)s / steps * 6.283185307f;
+                int32_t px = cx + (int32_t)(cosf(angle) * r);
+                int32_t py = cy + (int32_t)(sinf(angle) * r);
+                if(px > 4095) px = 4095; if(py > 4095) py = 4095;
+                hdac.Instance->DHR12RD = ((uint32_t)py << 16) | (uint32_t)px;
+                if(cpu_draw_delay > 0) {
+                    for(volatile int w=0; w<cpu_draw_delay; w++);
+                }
+            }
+        }
+    }
+}
+
 void DRAW_Render(void){
+    if(current_draw_mode == DRAW_MODE_CPU){
+        DRAW_Render_CPU();
+        return;
+    }
+
     DAC_Buff_Count = 0;
     
     // If no objects, output center point
@@ -413,7 +666,7 @@ void DRAW_Render(void){
                             int32_t dy = ty1 - ty0;
                             
                             // --- DRAWING SPEED / DENSITY CONTROL ---
-                            int steps = (int)sqrt((double)dx*dx + (double)dy*dy) / 5; 
+                            int steps = (int)sqrtf((float)dx*dx + (float)dy*dy) / 5; 
                             
                             if(steps < 2) steps = 2; // At least start and end points
                             
@@ -449,7 +702,7 @@ void DRAW_Render(void){
                 
                 int32_t dx = x1 - x0;
                 int32_t dy = y1 - y0;
-                int steps = (int)sqrt((double)dx*dx + (double)dy*dy) / 5;
+                int steps = (int)sqrtf((float)dx*dx + (float)dy*dy) / 5;
                 if(steps < 2) steps = 2;
                 
                 for(int s=0; s<=steps; s++){
@@ -479,7 +732,7 @@ void DRAW_Render(void){
                     
                     int32_t dx = x1 - x0;
                     int32_t dy = y1 - y0;
-                    int steps = (int)sqrt((double)dx*dx + (double)dy*dy) / 5;
+                    int steps = (int)sqrtf((float)dx*dx + (float)dy*dy) / 5;
                     if(steps < 2) steps = 2;
                     
                     for(int s=0; s<=steps; s++){
@@ -504,9 +757,9 @@ void DRAW_Render(void){
                 
                 for(int s=0; s<=steps; s++){
                     if(DAC_Buff_Count >= DRAW_BUF_SIZE) break;
-                    double angle = (double)s / steps * 6.283185307;
-                    DAC_Buff_X[DAC_Buff_Count] = cx + (int32_t)(cos(angle) * r);
-                    DAC_Buff_Y[DAC_Buff_Count] = cy + (int32_t)(sin(angle) * r);
+                    float angle = (float)s / steps * 6.283185307f;
+                    DAC_Buff_X[DAC_Buff_Count] = cx + (int32_t)(cosf(angle) * r);
+                    DAC_Buff_Y[DAC_Buff_Count] = cy + (int32_t)(sinf(angle) * r);
                     if(DAC_Buff_X[DAC_Buff_Count] > 4095) DAC_Buff_X[DAC_Buff_Count] = 4095;
                     if(DAC_Buff_Y[DAC_Buff_Count] > 4095) DAC_Buff_Y[DAC_Buff_Count] = 4095;
                     DAC_Buff_Count++;

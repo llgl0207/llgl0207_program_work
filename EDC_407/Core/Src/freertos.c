@@ -45,7 +45,12 @@ typedef enum {
     UI_MENU_GAME_LIST,
     UI_GAME,
     UI_BREAKOUT,
-    UI_DEBUG_INPUT
+    UI_DEBUG_INPUT,
+    UI_SETTINGS,
+    UI_SETTINGS_DRAW_MODE,
+    UI_SETTINGS_CPU_SPEED,
+    UI_SETTINGS_CPU_JUMP,
+    UI_SETTINGS_DRAW_DENSITY
 } UI_State;
 /* USER CODE END PTD */
 
@@ -454,6 +459,25 @@ void GuiTask(void const * argument)
   };
   const int game_menu_count = 3;
   
+  // Settings Menu Items
+  const char *settings_menu_items[] = {
+      "BACK",
+      "DRAW MODE",
+      "CPU SPEED",
+      "JUMP DWELL",
+      "DENSITY"
+  };
+  const int settings_menu_count = 5;
+  static int current_draw_mode_idx = 0; // 0:DMA, 1:CPU
+
+  // Draw Mode Menu Items
+  const char *draw_mode_menu_items[] = {
+      "BACK",
+      "DMA",
+      "CPU"
+  };
+  const int draw_mode_menu_count = 3;
+  
   // State Variables
   int menu_index = 0;
   int menu_scroll = 0;
@@ -470,7 +494,7 @@ void GuiTask(void const * argument)
   
   static uint16_t last_encoder = 0;
   static int32_t encoder_acc = 0;
-  static uint32_t last_blink_time = 0;
+  // static uint32_t last_blink_time = 0;
   static int blink_state = 1;
   
   /* Infinite loop */
@@ -492,6 +516,27 @@ void GuiTask(void const * argument)
         Update_Snake_Game();
     } else if(ui_state == UI_BREAKOUT) {
         Update_Breakout_Game(delta);
+    } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
+        if(delta != 0) {
+            int32_t d = (int32_t)DRAW_GetCPUDelay() + delta;
+            if(d < 0) d = 0;
+            if(d > 1000) d = 1000;
+            DRAW_SetCPUDelay((uint32_t)d);
+        }
+    } else if(ui_state == UI_SETTINGS_CPU_JUMP) {
+        if(delta != 0) {
+            int32_t d = (int32_t)DRAW_GetCPUJumpDwell() + delta;
+            if(d < 0) d = 0;
+            if(d > 1000) d = 1000;
+            DRAW_SetCPUJumpDwell((uint32_t)d);
+        }
+    } else if(ui_state == UI_SETTINGS_DRAW_DENSITY) {
+        if(delta != 0) {
+            int32_t d = (int32_t)DRAW_GetDrawDensity() + (delta * 10);
+            if(d < 10) d = 10;
+            if(d > 1000) d = 1000;
+            DRAW_SetDrawDensity((uint32_t)d);
+        }
     }
     
     // Handle Volume in Playing State
@@ -514,6 +559,12 @@ void GuiTask(void const * argument)
             if(current_text_line > total_text_lines - visible_lines) current_text_line = total_text_lines - visible_lines;
             if(current_text_line < 0) current_text_line = 0;
         }
+    } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
+        // Do nothing here, handled above
+    } else if(ui_state == UI_SETTINGS_CPU_JUMP) {
+        // Do nothing here, handled above
+    } else if(ui_state == UI_SETTINGS_DRAW_DENSITY) {
+        // Do nothing here, handled above
     } else {
         // Menu Navigation
         encoder_acc += delta;
@@ -526,6 +577,8 @@ void GuiTask(void const * argument)
             if(ui_state == UI_MENU_MAIN) max_items = main_menu_count;
             else if(ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST) max_items = music_file_count;
             else if(ui_state == UI_MENU_GAME_LIST) max_items = game_menu_count;
+            else if(ui_state == UI_SETTINGS) max_items = settings_menu_count;
+            else if(ui_state == UI_SETTINGS_DRAW_MODE) max_items = draw_mode_menu_count;
             
             if(menu_index < 0) menu_index = 0;
             if(menu_index >= max_items) menu_index = max_items - 1;
@@ -568,7 +621,63 @@ void GuiTask(void const * argument)
                      menu_index = 0;
                      menu_scroll = 0;
                      last_menu_index = -1;
+                 } else if(menu_index == 5) { // Settings
+                     ui_state = UI_SETTINGS;
+                     menu_index = 0;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
                  }
+             } else if(ui_state == UI_SETTINGS) {
+                 if(menu_index == 0) { // Back
+                     ui_state = UI_MENU_MAIN;
+                     menu_index = 5;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
+                 } else if(menu_index == 1) { // Draw Mode
+                     ui_state = UI_SETTINGS_DRAW_MODE;
+                     menu_index = 0;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
+                 } else if(menu_index == 2) { // CPU Speed
+                     ui_state = UI_SETTINGS_CPU_SPEED;
+                     last_menu_index = -1;
+                 } else if(menu_index == 3) { // Jump Dwell
+                     ui_state = UI_SETTINGS_CPU_JUMP;
+                     last_menu_index = -1;
+                 } else if(menu_index == 4) { // Draw Density
+                     ui_state = UI_SETTINGS_DRAW_DENSITY;
+                     last_menu_index = -1;
+                 }
+             } else if(ui_state == UI_SETTINGS_DRAW_MODE) {
+                 if(menu_index == 0) { // Back
+                     ui_state = UI_SETTINGS;
+                     menu_index = 1;
+                     menu_scroll = 0;
+                     last_menu_index = -1;
+                 } else if(menu_index == 1) { // DMA
+                     current_draw_mode_idx = 0;
+                     DRAW_SetMode(DRAW_MODE_DMA);
+                     last_menu_index = -1;
+                 } else if(menu_index == 2) { // CPU
+                     current_draw_mode_idx = 1;
+                     DRAW_SetMode(DRAW_MODE_CPU);
+                     last_menu_index = -1;
+                 }
+             } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
+                 ui_state = UI_SETTINGS;
+                 menu_index = 2;
+                 menu_scroll = 0;
+                 last_menu_index = -1;
+             } else if(ui_state == UI_SETTINGS_CPU_JUMP) {
+                 ui_state = UI_SETTINGS;
+                 menu_index = 3;
+                 menu_scroll = 0;
+                 last_menu_index = -1;
+             } else if(ui_state == UI_SETTINGS_DRAW_DENSITY) {
+                 ui_state = UI_SETTINGS;
+                 menu_index = 4;
+                 menu_scroll = 0;
+                 last_menu_index = -1;
              } else if(ui_state == UI_MENU_MUSIC_LIST) {
                  if(menu_index == 0) { // Back
                      ui_state = UI_MENU_MAIN;
@@ -652,10 +761,10 @@ void GuiTask(void const * argument)
             last_text_line = current_text_line;
         }
     } else {
-        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_BREAKOUT || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST) {
+        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_BREAKOUT || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST || ui_state == UI_SETTINGS || ui_state == UI_SETTINGS_DRAW_MODE || ui_state == UI_SETTINGS_CPU_SPEED || ui_state == UI_SETTINGS_CPU_JUMP || ui_state == UI_SETTINGS_DRAW_DENSITY) {
             redraw = 1;
             blink_state = 1; // Reset blink on move
-            last_blink_time = HAL_GetTick();
+            // last_blink_time = HAL_GetTick();
         }
     }
     
@@ -670,7 +779,7 @@ void GuiTask(void const * argument)
             if(ui_state == UI_GAME) sprintf(s, "SCORE: %d", game_score);
             else sprintf(s, "SCORE: %d", brk_score);
             SaveScroll(s);
-        } else if(ui_state == UI_MENU_MAIN || ui_state == UI_MENU_GAME_LIST || ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST) {
+        } else if(ui_state == UI_MENU_MAIN || ui_state == UI_MENU_GAME_LIST || ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST || ui_state == UI_SETTINGS || ui_state == UI_SETTINGS_DRAW_MODE) {
              // Determine items to save
              int count = 0;
              const char **items = NULL;
@@ -681,6 +790,12 @@ void GuiTask(void const * argument)
              } else if(ui_state == UI_MENU_GAME_LIST) {
                  count = game_menu_count;
                  items = game_menu_items;
+             } else if(ui_state == UI_SETTINGS) {
+                 count = settings_menu_count;
+                 items = settings_menu_items;
+             } else if(ui_state == UI_SETTINGS_DRAW_MODE) {
+                 count = draw_mode_menu_count;
+                 items = draw_mode_menu_items;
              } else {
                  count = music_file_count;
                  items = (const char**)music_files;
@@ -720,6 +835,37 @@ void GuiTask(void const * argument)
             DRAW_AddString(buf, 100, 100, 1400, 15, 15);
             
             DRAW_AddString("[PRESS ENC TO EXIT]", 100, 100, 800, 10, 10);
+            
+        } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
+            DRAW_AddString("CPU DRAW SPEED", 100, 100, 3500, 15, 15);
+            
+            char buf[32];
+            sprintf(buf, "DELAY: %d", DRAW_GetCPUDelay());
+            DRAW_AddString(buf, 100, 100, 2500, 15, 15);
+            
+            DRAW_AddString("[TURN ENC TO ADJUST]", 100, 100, 1500, 10, 10);
+            DRAW_AddString("[PRESS ENC TO EXIT]", 100, 100, 1000, 10, 10);
+            
+        } else if(ui_state == UI_SETTINGS_CPU_JUMP) {
+            DRAW_AddString("CPU JUMP DWELL", 100, 100, 3500, 15, 15);
+            
+            char buf[32];
+            sprintf(buf, "DWELL: %d", DRAW_GetCPUJumpDwell());
+            DRAW_AddString(buf, 100, 100, 2500, 15, 15);
+            
+            DRAW_AddString("[TURN ENC TO ADJUST]", 100, 100, 1500, 10, 10);
+            DRAW_AddString("[PRESS ENC TO EXIT]", 100, 100, 1000, 10, 10);
+            
+        } else if(ui_state == UI_SETTINGS_DRAW_DENSITY) {
+            DRAW_AddString("DRAW DENSITY", 100, 100, 3500, 15, 15);
+            
+            char buf[32];
+            sprintf(buf, "DENSITY: %d%%", DRAW_GetDrawDensity());
+            DRAW_AddString(buf, 100, 100, 2500, 15, 15);
+            DRAW_AddString("(100=NORM, >100=SLOW)", 100, 100, 2000, 10, 10);
+            
+            DRAW_AddString("[TURN ENC TO ADJUST]", 100, 100, 1500, 10, 10);
+            DRAW_AddString("[PRESS ENC TO EXIT]", 100, 100, 1000, 10, 10);
             
         } else if(ui_state == UI_GAME) {
             // Draw Snake Game
@@ -848,6 +994,12 @@ void GuiTask(void const * argument)
             } else if(ui_state == UI_MENU_GAME_LIST) {
                 count = game_menu_count;
                 items = game_menu_items;
+            } else if(ui_state == UI_SETTINGS) {
+                count = settings_menu_count;
+                items = settings_menu_items;
+            } else if(ui_state == UI_SETTINGS_DRAW_MODE) {
+                count = draw_mode_menu_count;
+                items = draw_mode_menu_items;
             } else {
                 count = music_file_count;
                 file_items = music_files;
@@ -864,7 +1016,23 @@ void GuiTask(void const * argument)
                 int y_pos = start_y - (i * line_height);
                 
                 const char *text;
-                if(items) text = items[item_idx];
+                char display_text[64];
+                if(items) {
+                    text = items[item_idx];
+                    if(ui_state == UI_SETTINGS && item_idx == 1) {
+                        sprintf(display_text, "DRAW MODE: %s", current_draw_mode_idx ? "CPU" : "DMA");
+                        text = display_text;
+                    }
+                    else if(ui_state == UI_SETTINGS_DRAW_MODE) {
+                        if(item_idx == 1 && current_draw_mode_idx == 0) {
+                            sprintf(display_text, "DMA [X]");
+                            text = display_text;
+                        } else if(item_idx == 2 && current_draw_mode_idx == 1) {
+                            sprintf(display_text, "CPU [X]");
+                            text = display_text;
+                        }
+                    }
+                }
                 else text = file_items[item_idx];
                 
                 // Draw Cursor
@@ -887,7 +1055,9 @@ void GuiTask(void const * argument)
         last_menu_index = menu_index;
         last_menu_scroll = menu_scroll;
         
-        DRAW_Render();
+        if(redraw || current_draw_mode_idx == 1) {
+            DRAW_Render();
+        }
     }
     
     osDelay(10);
