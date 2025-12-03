@@ -46,6 +46,8 @@ typedef enum {
     UI_GAME,
     UI_BREAKOUT,
     UI_FLAPPY,
+    UI_RACING,
+    UI_RUNTINY,
     UI_DEBUG_INPUT,
     UI_SETTINGS,
     UI_SETTINGS_DRAW_MODE,
@@ -77,6 +79,26 @@ typedef enum {
 #define FLP_OBSTACLE_SPACING 1600
 #define FLP_PLAYER_X 1000
 #define FLP_PLAYER_R 80
+
+// --- Racing Game Defines ---
+#define RACE_CAR_W 300
+#define RACE_CAR_H 500
+#define RACE_OBSTACLE_W 300
+#define RACE_OBSTACLE_H 300
+#define RACE_SPEED 40
+#define RACE_MAX_OBSTACLES 5
+
+// --- RunTiny Game Defines ---
+#define RUN_GROUND_Y 500
+#define RUN_PLAYER_X 800
+#define RUN_PLAYER_W 200
+#define RUN_PLAYER_H 300
+#define RUN_JUMP_FORCE 60
+#define RUN_GRAVITY 4
+#define RUN_SPEED 40
+#define RUN_OBSTACLE_W 150
+#define RUN_OBSTACLE_H 200
+#define RUN_MAX_OBSTACLES 3
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -95,6 +117,7 @@ extern volatile uint32_t SD_Wave_Write_Idx;
 extern uint8_t SD_Wave_Loaded;
 extern uint32_t SD_Wave_Total_Data_Left;
 extern uint8_t Video_Mode;
+volatile uint8_t Playback_Finished = 0;
 
 extern uint16_t volume;
 extern uint8_t pitch;
@@ -169,6 +192,42 @@ FlpObstacle flp_obstacles[FLP_MAX_OBSTACLES];
 int flp_score = 0;
 int flp_game_over = 0;
 
+// --- Racing Game Variables ---
+typedef struct {
+    int32_t x;
+} RaceCar;
+
+typedef struct {
+    int32_t x, y;
+    int active;
+    int passed;
+} RaceObstacle;
+
+RaceCar race_car;
+RaceObstacle race_obstacles[RACE_MAX_OBSTACLES];
+int race_score = 0;
+int race_game_over = 0;
+
+// --- RunTiny Game Variables ---
+typedef struct {
+    int32_t y;
+    int32_t vy;
+    int jumping;
+} RunPlayer;
+
+typedef struct {
+    int32_t x;
+    int active;
+    int passed;
+} RunObstacle;
+
+RunPlayer run_player;
+RunObstacle run_obstacles[RUN_MAX_OBSTACLES];
+int run_score = 0;
+int run_game_over = 0;
+
+volatile int SD_Status = 0; // 0: Waiting, 1: OK, <0: Error Code
+
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId myTask02Handle;
@@ -188,6 +247,13 @@ void Init_Breakout_Game(void);
 void Update_Breakout_Game(int16_t encoder_delta);
 void Init_Flappy_Game(void);
 void Update_Flappy_Game(int jump_requested);
+void Init_Racing_Game(void);
+void Update_Racing_Game(int16_t encoder_delta);
+void Init_RunTiny_Game(void);
+void Update_RunTiny_Game(int jump_requested);
+
+void Show_Boot_Sequence(void);
+void Show_Loading_Sequence(const char* game_name);
 
 // --- Scroll State Management ---
 #define MAX_SCROLL_STATES 16
@@ -308,7 +374,7 @@ void StartDefaultTask(void const * argument)
   res = f_mount(&fs, "0:", 1);
   if(res == FR_OK)
   {
-      DRAW_Terminal_Print("MOUNT OK\n");
+      SD_Status = 1;
       
       /* 
       // Auto-play test.wav DISABLED to prevent interference with Menu
@@ -364,9 +430,7 @@ void StartDefaultTask(void const * argument)
   }
   else
   {
-      char mnt_err[32];
-      sprintf(mnt_err, "MNT ERR:%d\n", res);
-      DRAW_Terminal_Print(mnt_err);
+      SD_Status = -res;
   }
 
   /* Infinite loop */
@@ -417,18 +481,17 @@ void AudioTask(void const * argument)
                 res = f_read(&fil, &SD_Wave_Buffer[SD_Wave_Write_Idx], space_at_end, &br);
                 
                 if(br < space_at_end) { 
-                    f_lseek(&fil, 44); 
-                    // Try reading rest from start
-                    UINT br2;
-                    f_read(&fil, &SD_Wave_Buffer[SD_Wave_Write_Idx + br], space_at_end - br, &br2);
+                    Playback_Finished = 1;
+                    SD_Wave_Loaded = 0;
+                    continue;
                 } 
                 
                 res = f_read(&fil, &SD_Wave_Buffer[0], to_read - space_at_end, &br);
                 
                 if(br < (to_read - space_at_end)) { 
-                    f_lseek(&fil, 44);
-                    UINT br2;
-                    f_read(&fil, &SD_Wave_Buffer[br], (to_read - space_at_end) - br, &br2);
+                    Playback_Finished = 1;
+                    SD_Wave_Loaded = 0;
+                    continue;
                 }
                 
                 SD_Wave_Write_Idx = to_read - space_at_end;
@@ -438,9 +501,9 @@ void AudioTask(void const * argument)
                 res = f_read(&fil, &SD_Wave_Buffer[SD_Wave_Write_Idx], to_read, &br);
                 
                 if(br < to_read) { 
-                    f_lseek(&fil, 44); 
-                    UINT br2;
-                    f_read(&fil, &SD_Wave_Buffer[SD_Wave_Write_Idx + br], to_read - br, &br2);
+                    Playback_Finished = 1;
+                    SD_Wave_Loaded = 0;
+                    continue;
                 } 
                 
                 SD_Wave_Write_Idx += to_read;
@@ -468,6 +531,8 @@ void GuiTask(void const * argument)
 {
   /* USER CODE BEGIN GuiTask */
   
+  Show_Boot_Sequence();
+
   UI_State ui_state = UI_MENU_MAIN;
   
   // Main Menu Items
@@ -487,10 +552,12 @@ void GuiTask(void const * argument)
   const char *game_menu_items[] = {
       "BACK",
       "SNAKE",
-      "BREAKOUT",
-      "FLAPPY DROID"
+      "BREAK",
+      "FLAPPY",
+      "RACING",
+      "RUNTINY"
   };
-  const int game_menu_count = 4;
+  const int game_menu_count = 6;
   
   // Settings Menu Items
   const char *settings_menu_items[] = {
@@ -551,6 +618,10 @@ void GuiTask(void const * argument)
         Update_Breakout_Game(delta);
     } else if(ui_state == UI_FLAPPY) {
         Update_Flappy_Game(0); // Normal update, jump handled in button section
+    } else if(ui_state == UI_RACING) {
+        Update_Racing_Game(delta);
+    } else if(ui_state == UI_RUNTINY) {
+        Update_RunTiny_Game(0);
     } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
         if(delta != 0) {
             int32_t d = (int32_t)DRAW_GetCPUDelay() + delta;
@@ -582,6 +653,19 @@ void GuiTask(void const * argument)
              if(new_vol < 0) new_vol = 0;
              volume = (uint16_t)new_vol;
         }
+        
+        if(Playback_Finished) {
+             Stop_Music();
+             if(strncmp(current_playing_file, "welcome.wav", MAX_FILENAME_LEN) == 0) {
+                 ui_state = UI_MENU_MAIN;
+                 menu_index = 6; // Return to About
+                 menu_mode = 0; // Reset mode
+             } else {
+                 ui_state = UI_MENU_MUSIC_LIST;
+             }
+             last_menu_index = -1;
+             Playback_Finished = 0;
+        }
     } else if(ui_state == UI_TEXT_VIEWER) {
         // Text Scrolling
         encoder_acc += delta;
@@ -591,7 +675,7 @@ void GuiTask(void const * argument)
             encoder_acc -= steps * 4;
             
             if(current_text_line < 0) current_text_line = 0;
-            if(current_text_line > total_text_lines - visible_lines) current_text_line = total_text_lines - visible_lines;
+            if(current_text_line > total_text_lines - 5) current_text_line = total_text_lines - 5;
             if(current_text_line < 0) current_text_line = 0;
         }
     } else if(ui_state == UI_SETTINGS_CPU_SPEED) {
@@ -631,6 +715,17 @@ void GuiTask(void const * argument)
         last_up_state = current_up_state;
     }
 
+    // --- RunTiny Specific Input (Non-blocking) ---
+    if(ui_state == UI_RUNTINY && !run_game_over) {
+        static uint8_t last_up_state = 1;
+        uint8_t current_up_state = HAL_GPIO_ReadPin(KEY_UP_GPIO_Port, KEY_UP_Pin);
+        
+        if(current_up_state == 0 && last_up_state == 1) { // Falling Edge (Press)
+            Update_RunTiny_Game(1); // Jump
+        }
+        last_up_state = current_up_state;
+    }
+
     // Button Logic (RS_Pin)
     if(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) {
         osDelay(20); // Debounce
@@ -642,7 +737,19 @@ void GuiTask(void const * argument)
                  menu_index = 0;
                  last_menu_index = -1;
                  while(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) osDelay(10);
-             } 
+             } else if(ui_state == UI_RACING) {
+                 // Exit Game
+                 ui_state = UI_MENU_GAME_LIST;
+                 menu_index = 0;
+                 last_menu_index = -1;
+                 while(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) osDelay(10);
+             } else if(ui_state == UI_RUNTINY) {
+                 // Exit Game
+                 ui_state = UI_MENU_GAME_LIST;
+                 menu_index = 0;
+                 last_menu_index = -1;
+                 while(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) osDelay(10);
+             }
              else {
                  while(HAL_GPIO_ReadPin(RS_GPIO_Port, RS_Pin) == GPIO_PIN_RESET) osDelay(10);
                  
@@ -680,6 +787,12 @@ void GuiTask(void const * argument)
                          ui_state = UI_SETTINGS;
                          menu_index = 0;
                          menu_scroll = 0;
+                         last_menu_index = -1;
+                     } else if(menu_index == 6) { // About
+                         strncpy(current_playing_file, "welcome.wav", MAX_FILENAME_LEN);
+                         Play_Video("/system/welcome.wav");
+                         ui_state = UI_PLAYING;
+                         menu_mode = 1; // Video Mode
                          last_menu_index = -1;
                      }
                  } else if(ui_state == UI_SETTINGS) {
@@ -766,21 +879,40 @@ void GuiTask(void const * argument)
                          menu_scroll = 0;
                          last_menu_index = -1;
                      } else if(menu_index == 1) { // Snake
+                         Show_Loading_Sequence("SNAKE");
                          Init_Snake_Game();
                          ui_state = UI_GAME;
                          last_menu_index = -1;
                      } else if(menu_index == 2) { // Breakout
+                         Show_Loading_Sequence("BREAKOUT");
                          Init_Breakout_Game();
                          ui_state = UI_BREAKOUT;
                          last_menu_index = -1;
                      } else if(menu_index == 3) { // Flappy
+                         Show_Loading_Sequence("FLAPPY DROID");
                          Init_Flappy_Game();
                          ui_state = UI_FLAPPY;
+                         last_menu_index = -1;
+                     } else if(menu_index == 4) { // Racing
+                         Show_Loading_Sequence("RACING");
+                         Init_Racing_Game();
+                         ui_state = UI_RACING;
+                         last_menu_index = -1;
+                     } else if(menu_index == 5) { // RunTiny
+                         Show_Loading_Sequence("RUNTINY");
+                         Init_RunTiny_Game();
+                         ui_state = UI_RUNTINY;
                          last_menu_index = -1;
                      }
                  } else if(ui_state == UI_PLAYING) {
                      Stop_Music();
-                     ui_state = UI_MENU_MUSIC_LIST;
+                     if(strncmp(current_playing_file, "welcome.wav", MAX_FILENAME_LEN) == 0) {
+                         ui_state = UI_MENU_MAIN;
+                         menu_index = 6; // Return to About
+                         menu_mode = 0; // Reset mode
+                     } else {
+                         ui_state = UI_MENU_MUSIC_LIST;
+                     }
                      last_menu_index = -1;
                  } else if(ui_state == UI_TEXT_VIEWER) {
                      ui_state = UI_MENU_TEXT_LIST;
@@ -795,6 +927,12 @@ void GuiTask(void const * argument)
                      last_menu_index = -1;
                  } else if(ui_state == UI_FLAPPY) {
                      if(flp_game_over) {
+                        ui_state = UI_MENU_GAME_LIST;
+                        menu_index = 0;
+                        last_menu_index = -1;
+                     }
+                 } else if(ui_state == UI_RACING) {
+                     if(race_game_over) {
                         ui_state = UI_MENU_GAME_LIST;
                         menu_index = 0;
                         last_menu_index = -1;
@@ -827,7 +965,7 @@ void GuiTask(void const * argument)
             last_text_line = current_text_line;
         }
     } else {
-        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_BREAKOUT || ui_state == UI_FLAPPY || ui_state == UI_DEBUG_INPUT || ui_state == UI_MENU_GAME_LIST || ui_state == UI_SETTINGS || ui_state == UI_SETTINGS_DRAW_MODE || ui_state == UI_SETTINGS_CPU_SPEED || ui_state == UI_SETTINGS_CPU_JUMP || ui_state == UI_SETTINGS_DRAW_DENSITY) {
+        if(menu_index != last_menu_index || menu_scroll != last_menu_scroll || ui_state == UI_PLAYING || ui_state == UI_GAME || ui_state == UI_BREAKOUT || ui_state == UI_FLAPPY || ui_state == UI_RACING || ui_state == UI_RUNTINY || ui_state == UI_DEBUG_INPUT || ui_state == UI_SETTINGS_CPU_SPEED || ui_state == UI_SETTINGS_CPU_JUMP || ui_state == UI_SETTINGS_DRAW_DENSITY || (current_draw_mode_idx == 1 && (ui_state == UI_MENU_GAME_LIST || ui_state == UI_SETTINGS || ui_state == UI_SETTINGS_DRAW_MODE))) {
             redraw = 1;
             blink_state = 1; // Reset blink on move
             // last_blink_time = HAL_GetTick();
@@ -838,13 +976,15 @@ void GuiTask(void const * argument)
         // Save scroll offset before clearing
         saved_scroll_count = 0;
         
-        if((ui_state == UI_GAME && game_over) || (ui_state == UI_BREAKOUT && brk_game_over) || (ui_state == UI_FLAPPY && flp_game_over)) {
+        if((ui_state == UI_GAME && game_over) || (ui_state == UI_BREAKOUT && brk_game_over) || (ui_state == UI_FLAPPY && flp_game_over) || (ui_state == UI_RACING && race_game_over) || (ui_state == UI_RUNTINY && run_game_over)) {
             if(ui_state == UI_BREAKOUT && brk_game_over == 2) SaveScroll("YOU WIN");
             else SaveScroll("GAME OVER");
             char s[32]; 
             if(ui_state == UI_GAME) sprintf(s, "SCORE: %d", game_score);
             else if(ui_state == UI_BREAKOUT) sprintf(s, "SCORE: %d", brk_score);
-            else sprintf(s, "SCORE: %d", flp_score);
+            else if(ui_state == UI_FLAPPY) sprintf(s, "SCORE: %d", flp_score);
+            else if(ui_state == UI_RACING) sprintf(s, "SCORE: %d", race_score);
+            else sprintf(s, "SCORE: %d", run_score);
             SaveScroll(s);
         } else if(ui_state == UI_MENU_MAIN || ui_state == UI_MENU_GAME_LIST || ui_state == UI_MENU_MUSIC_LIST || ui_state == UI_MENU_TEXT_LIST || ui_state == UI_SETTINGS || ui_state == UI_SETTINGS_DRAW_MODE) {
              // Determine items to save
@@ -959,12 +1099,12 @@ void GuiTask(void const * argument)
             DRAW_AddLine(fx - f_half, fy + f_half, fx + f_half, fy - f_half);
             
             if(game_over) {
-                int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 15, 15);
+                int16_t s1 = DRAW_AddString("GAME OVER", 100, 0, 2200, 15, 15);
                 RestoreScroll(s1, "GAME OVER");
                 
                 char score_str[32];
                 sprintf(score_str, "SCORE: %d   ", game_score); // Add spaces to ensure width > screen for scrolling
-                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
+                int16_t s2 = DRAW_AddString(score_str, 100, 0, 1600, 15, 15);
                 RestoreScroll(s2, score_str);
             }
         } else if(ui_state == UI_BREAKOUT) {
@@ -1014,16 +1154,16 @@ void GuiTask(void const * argument)
             // Draw Score/Lives
             if(brk_game_over) {
                 if(brk_game_over == 2) {
-                    int16_t s1 = DRAW_AddString("YOU WIN", 100, 1000, 2200, 15, 15);
+                    int16_t s1 = DRAW_AddString("YOU WIN", 100, 0, 2200, 15, 15);
                     RestoreScroll(s1, "YOU WIN");
                 } else {
-                    int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 15, 15);
+                    int16_t s1 = DRAW_AddString("GAME OVER", 100, 0, 2200, 15, 15);
                     RestoreScroll(s1, "GAME OVER");
                 }
                 
                 char score_str[32];
                 sprintf(score_str, "SCORE: %d   ", brk_score);
-                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
+                int16_t s2 = DRAW_AddString(score_str, 100, 0, 1600, 15, 15);
                 RestoreScroll(s2, score_str);
             } else {
                 char lives_str[16];
@@ -1063,17 +1203,95 @@ void GuiTask(void const * argument)
             }
             
             if(flp_game_over) {
-                int16_t s1 = DRAW_AddString("GAME OVER", 100, 1000, 2200, 15, 15);
+                int16_t s1 = DRAW_AddString("GAME OVER", 100, 0, 2200, 15, 15);
                 RestoreScroll(s1, "GAME OVER");
                 
                 char score_str[32];
                 sprintf(score_str, "SCORE: %d   ", flp_score);
-                int16_t s2 = DRAW_AddString(score_str, 100, 1200, 1600, 15, 15);
+                int16_t s2 = DRAW_AddString(score_str, 100, 0, 1600, 15, 15);
                 RestoreScroll(s2, score_str);
             } else {
                 char score_str[16];
                 sprintf(score_str, "%d", flp_score);
                 DRAW_AddString(score_str, 100, 2000, 3800, 15, 15);
+            }
+        } else if(ui_state == UI_RACING) {
+            // Draw Border
+            DRAW_AddRect(0, 0, 4095, 4095);
+            
+            // Draw Car
+            DRAW_AddRect(race_car.x, 200, RACE_CAR_W, RACE_CAR_H);
+            // Add some detail to car (wheels)
+            DRAW_AddRect(race_car.x - 50, 250, 50, 150);
+            DRAW_AddRect(race_car.x + RACE_CAR_W, 250, 50, 150);
+            DRAW_AddRect(race_car.x - 50, 500, 50, 150);
+            DRAW_AddRect(race_car.x + RACE_CAR_W, 500, 50, 150);
+            
+            // Draw Obstacles
+            for(int i=0; i<RACE_MAX_OBSTACLES; i++) {
+                if(race_obstacles[i].active) {
+                    DRAW_AddRect(race_obstacles[i].x, race_obstacles[i].y, RACE_OBSTACLE_W, RACE_OBSTACLE_H);
+                    // Draw X inside obstacle
+                    DRAW_AddLine(race_obstacles[i].x, race_obstacles[i].y, race_obstacles[i].x + RACE_OBSTACLE_W, race_obstacles[i].y + RACE_OBSTACLE_H);
+                    DRAW_AddLine(race_obstacles[i].x, race_obstacles[i].y + RACE_OBSTACLE_H, race_obstacles[i].x + RACE_OBSTACLE_W, race_obstacles[i].y);
+                }
+            }
+            
+            if(race_game_over) {
+                int16_t s1 = DRAW_AddString("GAME OVER", 100, 0, 2200, 15, 15);
+                RestoreScroll(s1, "GAME OVER");
+                
+                char score_str[32];
+                sprintf(score_str, "SCORE: %d   ", race_score);
+                int16_t s2 = DRAW_AddString(score_str, 100, 0, 1600, 15, 15);
+                RestoreScroll(s2, score_str);
+            } else {
+                char score_str[16];
+                sprintf(score_str, "%d", race_score);
+                DRAW_AddString(score_str, 100, 2000, 3500, 15, 15);
+            }
+        } else if(ui_state == UI_RUNTINY) {
+            // Draw Border
+            DRAW_AddRect(0, 0, 4095, 4095);
+            
+            // Draw Ground
+            DRAW_AddLine(0, RUN_GROUND_Y, 4096, RUN_GROUND_Y);
+            
+            // Draw Player
+            DRAW_AddRect(RUN_PLAYER_X, run_player.y, RUN_PLAYER_W, RUN_PLAYER_H);
+            // Legs animation
+            if(run_player.y == RUN_GROUND_Y) { // Only animate when running
+                static int leg_state = 0;
+                if(HAL_GetTick() % 200 < 100) leg_state = 0; else leg_state = 1;
+                
+                if(leg_state) {
+                    DRAW_AddLine(RUN_PLAYER_X + 50, run_player.y, RUN_PLAYER_X + 50, run_player.y - 50);
+                    DRAW_AddLine(RUN_PLAYER_X + 150, run_player.y, RUN_PLAYER_X + 150, run_player.y - 50);
+                } else {
+                    DRAW_AddLine(RUN_PLAYER_X + 20, run_player.y, RUN_PLAYER_X + 80, run_player.y - 50);
+                    DRAW_AddLine(RUN_PLAYER_X + 180, run_player.y, RUN_PLAYER_X + 120, run_player.y - 50);
+                }
+            }
+            
+            // Draw Obstacles
+            for(int i=0; i<RUN_MAX_OBSTACLES; i++) {
+                if(run_obstacles[i].active) {
+                    DRAW_AddRect(run_obstacles[i].x, RUN_GROUND_Y, RUN_OBSTACLE_W, RUN_OBSTACLE_H);
+                }
+            }
+            
+            if(run_game_over) {
+                int16_t s1 = DRAW_AddString("GAME OVER", 100, 0, 2200, 15, 15);
+                RestoreScroll(s1, "GAME OVER");
+                
+                char score_str[32];
+                sprintf(score_str, "SCORE: %d   ", run_score);
+                int16_t s2 = DRAW_AddString(score_str, 100, 0, 1600, 15, 15);
+                RestoreScroll(s2, score_str);
+            } else {
+                char score_str[16];
+                sprintf(score_str, "%d", run_score);
+                DRAW_AddString(score_str, 100, 2000, 3500, 15, 15);
             }
         } else if(ui_state == UI_PLAYING) {
             DRAW_AddString("PLAYING:", 100, 100, 3500, 15, 15);
@@ -1086,13 +1304,13 @@ void GuiTask(void const * argument)
             DRAW_AddString("[PRESS TO STOP]", 100, 100, 1000, 10, 10);
         } else if(ui_state == UI_TEXT_VIEWER) {
             // Render Text Lines
-            for(int i=0; i<visible_lines; i++) {
+            for(int i=0; i<5; i++) {
                 int line_idx = current_text_line + i;
                 if(line_idx >= total_text_lines) break;
                 
-                int y_pos = start_y - (i * 600);
-                // Use larger font for text: 15% scale//调节字号
-                DRAW_AddString(text_lines[line_idx], 75, 100, y_pos, 15, 15);
+                int y_pos = start_y - (i * 800);
+                // Use larger font for text: 25% scale//调节字号
+                DRAW_AddString(text_lines[line_idx], 50, 100, y_pos, 25, 25);
             }
         } else {
             // Menu Rendering
@@ -1219,9 +1437,14 @@ void Scan_Music_Files(const char* path) {
 
 void Play_Music(char* filename) {
     Stop_Music();
+    Playback_Finished = 0;
     
     char path[64];
-    sprintf(path, "/music/%s", filename);
+    if(filename[0] == '/') {
+        snprintf(path, sizeof(path), "%s", filename);
+    } else {
+        snprintf(path, sizeof(path), "/music/%s", filename);
+    }
     
     FRESULT res = f_open(&fil, path, FA_READ);
     if(res == FR_OK) {
@@ -1254,9 +1477,14 @@ void Play_Music(char* filename) {
 
 void Play_Video(char* filename) {
     Stop_Music();
+    Playback_Finished = 0;
     
     char path[64];
-    sprintf(path, "/video/%s", filename);
+    if(filename[0] == '/') {
+        snprintf(path, sizeof(path), "%s", filename);
+    } else {
+        snprintf(path, sizeof(path), "/video/%s", filename);
+    }
     
     FRESULT res = f_open(&fil, path, FA_READ);
     if(res == FR_OK) {
@@ -1396,7 +1624,7 @@ void Open_Text_File(char* filename) {
                 // ignore
             } else {
                 col++;
-                if(col >= 10) { // Max chars per line (10 chars for scale 15)
+                if(col >= 7) { // Max chars per line (7 chars for scale 25)
                     // Insert newline
                     if(len < SD_WAVE_MAX_LEN - 2) {
                         // Shift data
@@ -1687,5 +1915,188 @@ void Update_Flappy_Game(int jump_requested) {
             flp_obstacles[i].passed = 1;
         }
     }
+}
+
+void Init_Racing_Game(void) {
+    race_car.x = 2048 - (RACE_CAR_W / 2);
+    race_score = 0;
+    race_game_over = 0;
+    
+    // Init Obstacles
+    for(int i=0; i<RACE_MAX_OBSTACLES; i++) {
+        race_obstacles[i].active = 1;
+        race_obstacles[i].x = rand() % (4096 - RACE_OBSTACLE_W);
+        race_obstacles[i].y = 4096 + (i * 1500); // Spacing
+        race_obstacles[i].passed = 0;
+    }
+}
+
+void Update_Racing_Game(int16_t encoder_delta) {
+    if(race_game_over) return;
+    
+    // Move Car
+    race_car.x += encoder_delta * 150; // Sensitivity
+    if(race_car.x < 0) race_car.x = 0;
+    if(race_car.x > 4096 - RACE_CAR_W) race_car.x = 4096 - RACE_CAR_W;
+    
+    // Move Obstacles
+    int current_speed = RACE_SPEED + (race_score * 0.5);
+    if(current_speed > 150) current_speed = 150; // Cap speed
+
+    for(int i=0; i<RACE_MAX_OBSTACLES; i++) {
+        race_obstacles[i].y -= current_speed;
+        
+        // Recycle
+        if(race_obstacles[i].y < -RACE_OBSTACLE_H) {
+            // Find max y
+            int max_y = 0;
+            for(int j=0; j<RACE_MAX_OBSTACLES; j++) {
+                if(race_obstacles[j].y > max_y) max_y = race_obstacles[j].y;
+            }
+            race_obstacles[i].y = max_y + 1500; // Spacing
+            race_obstacles[i].x = rand() % (4096 - RACE_OBSTACLE_W);
+            race_obstacles[i].passed = 0;
+        }
+        
+        // Collision
+        // Simple AABB
+        if(race_car.x < race_obstacles[i].x + RACE_OBSTACLE_W &&
+           race_car.x + RACE_CAR_W > race_obstacles[i].x &&
+           200 < race_obstacles[i].y + RACE_OBSTACLE_H &&
+           200 + RACE_CAR_H > race_obstacles[i].y) {
+            race_game_over = 1;
+        }
+        
+        // Score
+        if(!race_obstacles[i].passed && race_obstacles[i].y + RACE_OBSTACLE_H < 200) {
+            race_score++;
+            race_obstacles[i].passed = 1;
+        }
+    }
+    
+    // Increase speed over time?
+    // Maybe later
+}
+
+void Init_RunTiny_Game(void) {
+    run_player.y = RUN_GROUND_Y;
+    run_player.vy = 0;
+    run_player.jumping = 0;
+    
+    run_score = 0;
+    run_game_over = 0;
+    
+    // Init Obstacles
+    for(int i=0; i<RUN_MAX_OBSTACLES; i++) {
+        run_obstacles[i].active = 1;
+        run_obstacles[i].x = 4096 + 1000 + (i * 2000) + (rand() % 800); // Spacing with jitter
+        run_obstacles[i].passed = 0;
+    }
+}
+
+void Update_RunTiny_Game(int jump_requested) {
+    if(run_game_over) return;
+    
+    // Physics
+    if(jump_requested && !run_player.jumping) {
+        run_player.vy = RUN_JUMP_FORCE;
+        run_player.jumping = 1;
+    }
+    
+    run_player.y += run_player.vy;
+    
+    if(run_player.y > RUN_GROUND_Y) {
+        run_player.vy -= RUN_GRAVITY;
+    } else {
+        run_player.y = RUN_GROUND_Y;
+        run_player.vy = 0;
+        run_player.jumping = 0;
+    }
+    
+    // Move Obstacles
+    int current_speed = RUN_SPEED + (run_score * 0.2);
+    if(current_speed > 100) current_speed = 100;
+    
+    for(int i=0; i<RUN_MAX_OBSTACLES; i++) {
+        run_obstacles[i].x -= current_speed;
+        
+        // Recycle
+        if(run_obstacles[i].x < -RUN_OBSTACLE_W) {
+            // Find max x
+            int max_x = 0;
+            for(int j=0; j<RUN_MAX_OBSTACLES; j++) {
+                if(run_obstacles[j].x > max_x) max_x = run_obstacles[j].x;
+            }
+            // More random spacing: 1200 to 2700 (Base 1200 + Random 1500)
+            run_obstacles[i].x = max_x + 1200 + (rand() % 1500);
+            run_obstacles[i].passed = 0;
+        }
+        
+        // Collision
+        if(run_obstacles[i].x < RUN_PLAYER_X + RUN_PLAYER_W &&
+           run_obstacles[i].x + RUN_OBSTACLE_W > RUN_PLAYER_X &&
+           run_player.y < RUN_GROUND_Y + RUN_OBSTACLE_H) { // Simple height check
+            run_game_over = 1;
+        }
+        
+        // Score
+        if(!run_obstacles[i].passed && run_obstacles[i].x + RUN_OBSTACLE_W < RUN_PLAYER_X) {
+            run_score++;
+            run_obstacles[i].passed = 1;
+        }
+    }
+}
+
+void Show_Boot_Sequence(void) {
+    DRAW_Terminal_Init(12, 100); // Scale 12, Spacing 100
+    
+    DRAW_Terminal_Print("> SYSTEM BOOT...\n");
+    osDelay(200);
+    DRAW_Terminal_Print("> CPU: STM32F407 @ 168MHz\n");
+    osDelay(100);
+    DRAW_Terminal_Print("> RAM: 192KB OK\n");
+    osDelay(100);
+    DRAW_Terminal_Print("> DAC: INITIALIZED\n");
+    osDelay(100);
+    DRAW_Terminal_Print("> CHECKING SD CARD...\n");
+    
+    // Wait for SD (Timeout 3s)
+    int timeout = 30;
+    while(SD_Status == 0 && timeout > 0) {
+        osDelay(100);
+        timeout--;
+    }
+    
+    if(SD_Status == 1) {
+        DRAW_Terminal_Print("> SD CARD: MOUNTED [OK]\n");
+    } else {
+        char buf[32];
+        sprintf(buf, "> SD CARD: FAILED [%d]\n", SD_Status);
+        DRAW_Terminal_Print(buf);
+    }
+    osDelay(200);
+    
+    DRAW_Terminal_Print("> LOADING KERNEL...\n");
+    osDelay(300);
+    DRAW_Terminal_Print("> SYSTEM READY.\n");
+    osDelay(500);
+}
+
+void Show_Loading_Sequence(const char* game_name) {
+    DRAW_Terminal_Init(15, 100);
+    char buf[64];
+    
+    sprintf(buf, "> LOADING %s...\n", game_name);
+    DRAW_Terminal_Print(buf);
+    osDelay(200);
+    
+    DRAW_Terminal_Print("> ALLOCATING MEMORY...\n");
+    osDelay(100);
+    
+    DRAW_Terminal_Print("> INIT GRAPHICS...\n");
+    osDelay(100);
+    
+    DRAW_Terminal_Print("> STARTING...\n");
+    osDelay(300);
 }
 /* USER CODE END Application */
