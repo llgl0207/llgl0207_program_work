@@ -28,65 +28,14 @@ Project File Date:  11/29/2025
 *** Using Compiler 'V5.06 update 6 (build 750)', folder: 'D:\Program Files\Keil_v5\ARM\ARMCC\Bin'
 Build target 'EDC_407'
 compiling draw.c...
-../Core/Src/draw.c(237): warning:  #177-D: function "set_pattern_by_char"  was declared but never referenced
-  static uint8_t set_pattern_by_char(char c){
-../Core/Src/draw.c(233): warning:  #177-D: function "compute_pattern_minmax_x"  was declared but never referenced
-  static void compute_pattern_minmax_x(const Line_t *p, uint8_t len, int32_t *minx, int32_t *maxx){
-../Core/Src/draw.c(118): warning:  #550-D: variable "patterns"  was set but never used
-  static const Line_t * const patterns[] = {
-../Core/Src/draw.c(137): warning:  #177-D: variable "pattern_lengths"  was declared but never referenced
-  static const uint8_t pattern_lengths[] = {
-../Core/Src/draw.c(171): warning:  #177-D: variable "patterns_count"  was declared but never referenced
-  static const uint8_t patterns_count = sizeof(patterns)/sizeof(patterns[0]);
-../Core/Src/draw.c(174): warning:  #177-D: variable "pattern_index"  was declared but never referenced
-  static uint8_t pattern_index = 0;
-../Core/Src/draw.c(175): warning:  #177-D: variable "current_pattern"  was declared but never referenced
-  static const Line_t *current_pattern = NULL;
-../Core/Src/draw.c(176): warning:  #177-D: variable "current_pattern_length"  was declared but never referenced
-  static uint8_t current_pattern_length = 0;
-../Core/Src/draw.c(179): warning:  #177-D: variable "scale_x_pct"  was declared but never referenced
-  static uint16_t scale_x_pct = 100;
-../Core/Src/draw.c(180): warning:  #177-D: variable "scale_y_pct"  was declared but never referenced
-  static uint16_t scale_y_pct = 100;
-../Core/Src/draw.c(181): warning:  #177-D: variable "offset_x"  was declared but never referenced
-  static int32_t offset_x = 0;
-../Core/Src/draw.c(182): warning:  #177-D: variable "offset_y"  was declared but never referenced
-  static int32_t offset_y = 0;
-../Core/Src/draw.c(215): warning:  #177-D: variable "draw_pool"  was declared but never referenced
-  static DrawObj draw_pool[MAX_DRAW_OBJS];
-../Core/Src/draw.c(218): warning:  #177-D: variable "term_scale"  was declared but never referenced
-  static uint16_t term_scale = 10;
-../Core/Src/draw.c(219): warning:  #177-D: variable "term_line_height"  was declared but never referenced
-  static int32_t term_line_height = 400;
-../Core/Src/draw.c(220): warning:  #177-D: variable "term_char_spacing"  was declared but never referenced
-  static int32_t term_char_spacing = 100;
-../Core/Src/draw.c(221): warning:  #177-D: variable "term_current_line"  was declared but never referenced
-  static int8_t term_current_line = 0;
-../Core/Src/draw.c(222): warning:  #177-D: variable "term_cursor_x"  was declared but never referenced
-  static int32_t term_cursor_x = 0;
-../Core/Src/draw.c(223): warning:  #177-D: variable "term_cursor_y"  was declared but never referenced
-  static int32_t term_cursor_y = 4096; // ???????????€??? (?????? 4096 ?????????)
-../Core/Src/draw.c(224): warning:  #177-D: variable "term_max_lines"  was declared but never referenced
-  static uint8_t term_max_lines = MAX_DRAW_OBJS;
-../Core/Src/draw.c(227): warning:  #177-D: variable "current_draw_mode"  was declared but never referenced
-  static DrawMode current_draw_mode = DRAW_MODE_DMA;
-../Core/Src/draw.c(228): warning:  #177-D: variable "cpu_draw_delay"  was declared but never referenced
-  static uint32_t cpu_draw_delay = 10; // CPU ???????€????????????????
-../Core/Src/draw.c(229): warning:  #177-D: variable "cpu_jump_dwell"  was declared but never referenced
-  static uint32_t cpu_jump_dwell = 0; // CPU ??????????????????????????????
-../Core/Src/draw.c(230): warning:  #177-D: variable "draw_density"  was declared but never referenced
-  static uint32_t draw_density = 100; // ????????????: 100 = 1.0x (??????), 200 = 2.0x (??????/??????), 50 = 0.5x (??????)
-../Core/Src/draw.c(271): warning:  #177-D: function "DRAW_Render_CPU"  was declared but never referenced
-  static void DRAW_Render_CPU(void){
-../Core/Src/draw.c: 25 warnings, 0 errors
 compiling freertos.c...
 ../Core/Src/freertos.c(473): warning:  #550-D: variable "res"  was set but never used
               FRESULT res;
 ../Core/Src/freertos.c: 1 warning, 0 errors
 linking...
-Program Size: Code=53704 RO-data=2008 RW-data=980 ZI-data=52868  
+Program Size: Code=62880 RO-data=6036 RW-data=1048 ZI-data=122404  
 FromELF: creating hex file...
-"EDC_407\EDC_407.axf" - 0 Error(s), 26 Warning(s).
+"EDC_407\EDC_407.axf" - 0 Error(s), 1 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -109,7 +58,7 @@ Package Vendor: Keil
 <h2>Collection of Component Files used:</h2>
 
    * Component: ARM::CMSIS:CORE:5.1.2
-Build Time Elapsed:  00:00:04
+Build Time Elapsed:  00:00:03
 </pre>
 </body>
 </html>

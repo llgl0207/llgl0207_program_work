@@ -586,9 +586,9 @@ void GuiTask(void const * argument)
   int menu_mode = 0; // 0: Music, 1: Video, 2: Text
   
   // UI Constants
-  const int line_height = 500;
+  const int line_height = 700;
   const int start_y = 3500;
-  const int visible_lines = 6;
+  const int visible_lines = 5;
   
   DRAW_Clear();
   
@@ -1304,11 +1304,11 @@ void GuiTask(void const * argument)
             DRAW_AddString("[PRESS TO STOP]", 100, 100, 1000, 10, 10);
         } else if(ui_state == UI_TEXT_VIEWER) {
             // Render Text Lines
-            for(int i=0; i<5; i++) {
+            for(int i=0; i<3; i++) {
                 int line_idx = current_text_line + i;
                 if(line_idx >= total_text_lines) break;
                 
-                int y_pos = start_y - (i * 800);
+                int y_pos = start_y - (i * 1200);
                 // Use larger font for text: 25% scale//调节字号
                 DRAW_AddString(text_lines[line_idx], 50, 100, y_pos, 25, 25);
             }

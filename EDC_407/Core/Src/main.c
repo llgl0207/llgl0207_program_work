@@ -146,7 +146,12 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  DRAW_AddString("SYSTEM INIT...", 12, 0, 0, 100, 100);//示波器显示字符串
+  DRAW_AddCircle(50, 50, 30);//示波器显示圆形
+  DRAW_AddLine(0, 0, 200, 200);//示波器显示直线
+  DRAW_AddRect(100, 100, 50, 50);//示波器显示矩形
+  DRAW_Terminal_Print("HAL INIT DONE\n");//示波器终端打印字符串
+  DRAW_Clear();//清除示波器显示
   /* USER CODE END Init */
 
   /* Configure the system clock */
