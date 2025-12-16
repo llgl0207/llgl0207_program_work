@@ -3,6 +3,12 @@
 #include "DAC8554.h"
 #include "pins.h"
 #include "gamepad_task.h"
+#include "sdcard.h"
+
+// Debug: SAFE_MODE skips SD init to diagnose resets
+#ifndef SAFE_MODE
+#define SAFE_MODE 1
+#endif
 
 // 引脚定义移至 pins.h
 
@@ -43,10 +49,18 @@ void setup() {
 
   // 3. 初始化 DAC 库
   dac.begin();
-  dac.setSPIspeed(1000000); // 降低 SPI 速度到 1MHz 以提高稳定性
+  dac.setSPIspeed(12000000); // 提升到 12MHz 进一步提高吞吐
 
   // 关闭 DAC8554 输出（高阻态）
   dac.broadcastPowerDown(DAC8554_POWERDOWN_HIGH_IMP);
+
+  // 初始化 SD 卡 (4-bit SDIO)
+  if (!SAFE_MODE) {
+    init_sdcard();
+    Serial.println("[BOOT] SD init ok");
+  } else {
+    Serial.println("[BOOT] SAFE_MODE: skipping SD init");
+  }
 
   // 启动手柄/按键检测 FreeRTOS 任务
   initGamepadTask();
@@ -56,4 +70,5 @@ void setup() {
 
 void loop() {
   // 空置：手柄与按键检测已移入 FreeRTOS 任务
+  delay(50);
 }

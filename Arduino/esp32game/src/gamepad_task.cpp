@@ -3,6 +3,8 @@
 #include "gamepad_task.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "draw_esp.h"
+#include "ui_menu.h"
 
 class TouchButton {
   private:
@@ -42,6 +44,14 @@ static TouchButton btn6(6, 30000);
 static TouchButton btn7(7, 30000);
 
 static void GamepadTask(void* pv) {
+  // init draw engine with ~10us interval, CPU mode initially
+  extern DAC8554 dac; // use instance from main.cpp
+  DRAW_InitESP(&dac, 5); // 5us timer interval for higher sample rate
+  DRAW_SetModeESP(DRAW_MODE_TIMER_BUFFERED); // buffered output on channels 0/1
+  DRAW_SetScaleESP(4, 4); // 12-bit base -> 16-bit via <<4
+  dac.broadcastPowerDown(DAC8554_POWERDOWN_NORMAL);
+  ui_menu_init();
+
   for (;;) {
     // Update touch buttons
     btn4.update();
@@ -66,13 +76,14 @@ static void GamepadTask(void* pv) {
     int tDown = btn6.getState();
     int tRight = btn7.getState();
 
-    Serial.printf("J1:%4d,%4d,%d | J2:%4d,%4d,%d | A:%d B:%d | Dpad:%d,%d,%d,%d\n",
-                  j1x, j1y, j1sw,
-                  j2x, j2y, j2sw,
-                  btnA, btnB,
-                  tUp, tLeft, tDown, tRight);
+    // process touch input (threshold already handled by TouchButton)
+    ui_menu_update(tUp, tDown, tLeft, tRight);
+    // Build UI frame for channels 0/1
+    DRAW_BeginFrameESP();
+    ui_menu_render();
+    DRAW_EndFrameESP();
 
-    vTaskDelay(pdMS_TO_TICKS(10)); // ~100 Hz
+    vTaskDelay(pdMS_TO_TICKS(10)); // UI update pacing
   }
 }
 
