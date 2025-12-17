@@ -1,14 +1,25 @@
 #include <Arduino.h>
-#include "pins.h"
-#include "DACoutput.h"
-#include "vector_draw.h"
+#include <SPI.h>
 #include "driver/spi_master.h"
+#include "driver/gptimer.h"
+#include "soc/spi_reg.h"
+#include "soc/spi_struct.h"
 
-hw_timer_t * timer = NULL;
-
-// Define constants from DAC8554.cpp since they are not in .h
-#define DAC8554_BUFFER_WRITE          0x00
-#define DAC8554_ALL_WRITE             0x20
+// 定义 DAC8554 引脚
+// LDAC: IO9, CS: IO10, MOSI: IO11, SCLK: IO12
+#define DAC_LDAC  9
+#define DAC_CS    10
+#define DAC_MOSI  11
+#define DAC_SCLK  12
+#define DAC_MISO  -1 // MISO 不使用，设为 -1 避免与 JOY1_X (IO13) 冲突
+#define JOY_A 18
+#define JOY_B 21
+#define JOY1_X 13
+#define JOY1_Y 3
+#define JOY2_X 15
+#define JOY2_Y 14
+#define JOY1_SW 16
+#define JOY2_SW 17
 
 // ESP-IDF SPI 相关变量
 spi_device_handle_t spi;
@@ -101,90 +112,9 @@ void init_esp_spi() {
     
     Serial.println("ESP-IDF SPI初始化完成!");
 }
-// Pre-calculated masks for fast GPIO
-uint32_t csMask;
-uint32_t mosiMask;
-uint32_t sclkMask;
-uint32_t ldacMask;
+void setup(){
 
-// 优化的 DAC8554 发送函数
-// 合并 Config 和 Value 为 24位数据发送，减少循环开销
-void IRAM_ATTR sendDAC(uint8_t configRegister, uint16_t value) {
-  // CS LOW
-  GPIO.out_w1tc = csMask;
-
-  // 组合 24位 数据: 8位 Config + 16位 Value
-  uint32_t data = ((uint32_t)configRegister << 16) | value;
-
-  // 发送 24 bits
-  for (uint32_t mask = 0x800000; mask; mask >>= 1) {
-    if (data & mask) GPIO.out_w1ts = mosiMask;
-    else GPIO.out_w1tc = mosiMask;
+}
+void loop(){
     
-    GPIO.out_w1ts = sclkMask;
-    GPIO.out_w1tc = sclkMask;
-  }
-
-  // CS HIGH
-  GPIO.out_w1ts = csMask;
-}
-
-void IRAM_ATTR onTimer() {
-  uint16_t outX, outY;
-  
-  // 获取当前需要绘制的坐标
-  DRAW_GetNextPoint(outX, outY);
-
-  // 发送 X 到通道 0
-  dac8554_send_frame(0, outX, DAC8554_SINGLE_WRITE);
-
-  // 发送 Y 到通道 1
-  //dac8554_send_frame(1, outY, DAC8554_BUFFER_WRITE);
-
-  // 脉冲 LDAC 更新输出
-  GPIO.out_w1tc = ldacMask; // LOW
-  GPIO.out_w1ts = ldacMask; // HIGH
-}
-
-void initDACoutput() {
-  // 初始化 DAC LDAC 引脚
-  pinMode(DAC_LDAC, OUTPUT);
-  digitalWrite(DAC_LDAC, HIGH); 
-
-  // 确保 DAC 初始化
- init_esp_spi();
-
-  // 设置快速 GPIO 掩码
-  csMask = (1 << DAC_CS);
-  mosiMask = (1 << DAC_MOSI);
-  sclkMask = (1 << DAC_SCLK);
-  ldacMask = (1 << DAC_LDAC);
-
-  // 初始化绘图逻辑
-  DRAW_Init();
-
-  // 初始化定时器 0
-  // 预分频 2 -> 1 tick = 25ns (80MHz APB)
-  timer = timerBegin(0, 2, true);
-
-  // 绑定中断
-  timerAttachInterrupt(timer, &onTimer, true);
-
-  // 设置默认频率 80kHz
-  setDACFreq(40000);
-
-  // 启用报警
-  timerAlarmEnable(timer);
-}
-
-void setDACFreq(uint32_t freq) {
-  if (timer == NULL) return;
-  if (freq == 0) freq = 1;
-  
-  // 80MHz / 2 = 40MHz
-  // ticks = 40,000,000 / freq
-  uint32_t ticks = 40000000 / freq;
-  if (ticks < 100) ticks = 100; // 限制最大频率约 400kHz
-  
-  timerAlarmWrite(timer, ticks, true);
 }
