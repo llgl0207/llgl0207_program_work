@@ -1,9 +1,9 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include "driver/spi_master.h"
-#include "driver/gptimer.h"
-#include "soc/spi_reg.h"
-#include "soc/spi_struct.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
 
 // 定义 DAC8554 引脚
 // LDAC: IO9, CS: IO10, MOSI: IO11, SCLK: IO12
@@ -21,10 +21,13 @@
 #define JOY1_SW 16
 #define JOY2_SW 17
 
+// 实例化 DAC 对象
+// 参数: CS引脚, SPI对象
+
 // ESP-IDF SPI 相关变量
 spi_device_handle_t spi;
 
-// DAC8554 命令寄存器定义（与底层驱动保持一致）
+// DAC8554 命令寄存器定义
 #define DAC8554_BUFFER_WRITE          0x00
 #define DAC8554_SINGLE_WRITE          0x10
 #define DAC8554_ALL_WRITE             0x20
@@ -63,22 +66,22 @@ void dac8554_send_frame(uint8_t channel, uint16_t value, uint8_t writeMode) {
 }
 
 /**
- * @brief 初始化ESP-IDF SPI总线
+ * @brief 初始化ESP-IDF SPI总线（启用DMA）
  */
 void init_esp_spi() {
     esp_err_t ret;
     
-    // SPI总线配置 - 增大DMA传输大小限制
+    // SPI总线配置
     spi_bus_config_t buscfg = {
         .mosi_io_num = DAC_MOSI,
         .miso_io_num = DAC_MISO,
         .sclk_io_num = DAC_SCLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = 4096  // 增大到4KB，支持大块DMA传输
+        .max_transfer_sz = 32
     };
     
-    // 初始化SPI总线 - 启用DMA
+    // 初始化SPI总线（启用DMA）
     ret = spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO);
     if (ret != ESP_OK) {
         Serial.println("SPI总线初始化失败!");
@@ -112,9 +115,82 @@ void init_esp_spi() {
     
     Serial.println("ESP-IDF SPI初始化完成!");
 }
-void setup(){
 
-}
-void loop(){
+// DMA发送单帧DAC数据
+void dma_send_dac_frame(uint16_t dac_value) {
+    // 构建24位SPI数据帧
+    uint8_t tx_data[3];
+    tx_data[0] = (0 << 1) | DAC8554_ALL_WRITE;  // 通道0 + ALL_WRITE
+    tx_data[1] = (dac_value >> 8) & 0xFF;       // 数据高8位
+    tx_data[2] = dac_value & 0xFF;              // 数据低8位
     
+    // 配置DMA传输
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    t.length = 24;          // 24位数据长度
+    t.tx_buffer = tx_data;  // 发送缓冲区
+    t.user = (void*)1;      // 标记为DMA传输
+    
+    // 使用DMA传输（非阻塞）
+    esp_err_t ret = spi_device_queue_trans(spi, &t, portMAX_DELAY);
+    if (ret != ESP_OK) {
+        Serial.print("DMA传输失败: ");
+        Serial.println(ret);
+        return;
+    }
+    
+    // 等待传输完成
+    spi_transaction_t* rx_trans;
+    ret = spi_device_get_trans_result(spi, &rx_trans, portMAX_DELAY);
+    if (ret == ESP_OK) {
+        // 触发LDAC更新
+        digitalWrite(DAC_LDAC, LOW);
+        delayMicroseconds(1);
+        digitalWrite(DAC_LDAC, HIGH);
+        
+        Serial.print("DMA发送完成，DAC值: ");
+        Serial.println(dac_value);
+    } else {
+        Serial.print("DMA传输等待失败: ");
+        Serial.println(ret);
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(1000);
+    
+    Serial.println("ESP32-S3 DMA单帧测试程序启动");
+    
+    // 初始化ESP-IDF SPI
+    if (init_esp_spi() != ESP_OK) {
+        Serial.println("SPI初始化失败");
+        while(1);
+    }
+    
+    // 初始化LDAC引脚
+    pinMode(DAC_LDAC, OUTPUT);
+    digitalWrite(DAC_LDAC, HIGH);
+    
+    Serial.println("系统初始化完成，发送任意字符开始DMA测试");
+}
+
+void loop() {
+    static uint16_t test_value = 0;
+    
+    // 检查串口输入
+    if (Serial.available()) {
+        Serial.read();  // 清空缓冲区
+        
+        // DMA发送DAC数据
+        dma_send_dac_frame(test_value);
+        
+        Serial.print("DMA发送完成，DAC值: ");
+        Serial.println(test_value);
+        
+        // 递增测试值
+        test_value = (test_value + 1000) % 65536;
+    }
+    
+    delay(100);
 }
