@@ -5,7 +5,7 @@ import pydirectinput
 import pyautogui
 
 # ================= 配置区域 =================
-SERIAL_PORT = 'COM3'  # 串口号
+SERIAL_PORT = 'COM19'  # 串口号
 BAUD_RATE = 115200
 MOUSE_SPEED = 5      # 鼠标移动速度系数
 SCROLL_SPEED = 80     # 滚轮速度系数
