@@ -1,0 +1,29 @@
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma_ex.c
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Core/Inc/stm32f4xx_hal_conf.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_def.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f4xx.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f429xx.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/CMSIS/Include/core_cm4.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/CMSIS/Include/cmsis_version.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/CMSIS/Include/cmsis_compiler.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/CMSIS/Include/cmsis_armcc.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/CMSIS/Include/mpu_armv7.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/CMSIS/Device/ST/STM32F4xx/Include/system_stm32f4xx.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc_ex.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_gpio.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_gpio_ex.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_exti.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma_ex.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_cortex.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ex.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h
+eide_ozone_test\stm32f4xx_hal_dma_ex.o: ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h

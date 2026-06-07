@@ -1,0 +1,24 @@
+--cpu=Cortex-M4.fp
+"eide_ozone_test\startup_stm32f429xx.o"
+"eide_ozone_test\main.o"
+"eide_ozone_test\gpio.o"
+"eide_ozone_test\stm32f4xx_it.o"
+"eide_ozone_test\stm32f4xx_hal_msp.o"
+"eide_ozone_test\stm32f4xx_hal_rcc.o"
+"eide_ozone_test\stm32f4xx_hal_rcc_ex.o"
+"eide_ozone_test\stm32f4xx_hal_flash.o"
+"eide_ozone_test\stm32f4xx_hal_flash_ex.o"
+"eide_ozone_test\stm32f4xx_hal_flash_ramfunc.o"
+"eide_ozone_test\stm32f4xx_hal_gpio.o"
+"eide_ozone_test\stm32f4xx_hal_dma_ex.o"
+"eide_ozone_test\stm32f4xx_hal_dma.o"
+"eide_ozone_test\stm32f4xx_hal_pwr.o"
+"eide_ozone_test\stm32f4xx_hal_pwr_ex.o"
+"eide_ozone_test\stm32f4xx_hal_cortex.o"
+"eide_ozone_test\stm32f4xx_hal.o"
+"eide_ozone_test\stm32f4xx_hal_exti.o"
+"eide_ozone_test\system_stm32f4xx.o"
+--strict --scatter "EIDE_Ozone_TEST\EIDE_Ozone_TEST.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "EIDE_Ozone_TEST.map" -o EIDE_Ozone_TEST\EIDE_Ozone_TEST.axf
